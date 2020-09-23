@@ -1,0 +1,13 @@
+Package: omd
+Title: Optimal Transport for the Ocean
+Version: 0.0.0.9000
+Authors@R: 
+    person(given = "Sangwon",
+           family = "Hyun",
+           role = c("aut", "cre"),
+           email = "robohyun66@gmail.com",
+           comment = c(ORCID = "0000-0003-0377-897X"))
+Description: Implements optimal transport (earth-movers distance) to data in the ocean.
+License: ?
+Encoding: UTF-8
+LazyData: true
