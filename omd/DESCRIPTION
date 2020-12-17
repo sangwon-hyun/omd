@@ -11,3 +11,4 @@ Description: Implements optimal transport (earth-movers distance) to data in the
 License: ?
 Encoding: UTF-8
 LazyData: true
+RoxygenNote: 7.1.1

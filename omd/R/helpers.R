@@ -1,6 +1,5 @@
-
-
 ##' Plots a vector field that characterizes the optimal transport.
+##'
 ##' @param jan.dat one dataset.
 ##' @param feb.dat another dataset
 ##'
@@ -79,9 +78,13 @@ plot_vf <- function(jan.dat, feb.dat, res){
 ##' @param p2 The second \code{pgrid} object.
 ##'
 ##' @return The Wasserstein distance
+##'
+##' @export
 compute_wasserstein <- function(p1, p2){
+
   res <- transport::transport(p1, p2, p = 2, method = "aha")
   transport::wasserstein(p1, p2, p = 2, tplan = res)
+
 }
 
 
@@ -93,6 +96,8 @@ compute_wasserstein <- function(p1, p2){
 ##'
 ##' @return A vector of colors, mostly blue, except for the top \code{prob}
 ##'   quantile.
+##'
+##' @export
 make_colors <- function(res, prob = 0.1){
   cutoffs = quantile(res$mass, probs = c(1-prob, 1))
   ii = 1
@@ -108,6 +113,7 @@ make_colors <- function(res, prob = 0.1){
 ##'
 ##' @return The same object.
 ##'
+##' @export
 fill_na <- function(mat){
   if(any(is.na(mat))){
     all_na_inds = which(is.na(mat), arr.ind=TRUE)
@@ -124,7 +130,9 @@ fill_na <- function(mat){
 
 
 ##' Taken from stackoverflow..
-get_surround = function(data, index, type="all"){
+##'
+##' @export
+get_surround <- function(data, index, type="all"){
   row_height = dim(data)[1]
   col_height = dim(data)[2]
   if(type!= "all" && type!="direct"){
@@ -150,6 +158,8 @@ get_surround = function(data, index, type="all"){
 
 
 ##' Taken from Justin's convenience functions..
+##'
+##' @export
 drawmat_precise <- function(mat, contour = FALSE, ...){
 
 ## Dummy data
@@ -177,6 +187,8 @@ drawmat_precise <- function(mat, contour = FALSE, ...){
 
 ##' Makes a pgrid object, from a matrix whose row names and column names contain
 ##' *equally spaced* latitudes and longitudes.
+##'
+##' @export
 make_pgrid <- function(dat){
   lat = rownames(dat) %>% as.numeric() ##+ c(1, rep(0,nrow(dat)-1))
   lon = colnames(dat) %>% as.numeric()
@@ -186,7 +198,7 @@ make_pgrid <- function(dat){
 }
 
 
-
+##' @export
 matsplitter<-function(M, r, c) {
     rg <- (row(M)-1)%/%r+1
     cg <- (col(M)-1)%/%c+1
@@ -198,6 +210,7 @@ matsplitter<-function(M, r, c) {
 }
 
 
+##' @export
 avg <- function(num){
   nn = length(num)
   starts = seq(from=1, to=nn, by=2)
@@ -206,11 +219,19 @@ avg <- function(num){
   })
 }
 
-
+##' @export
 avg_coarsen <- function(d1){
   resol = nrow(d1)
   d2 = matrix(apply(matsplitter(d1, 2, 2), 3, mean), ncol=resol/2)
   rownames(d2) = rownames(d1) %>% as.numeric %>% avg()
   colnames(d2) = colnames(d1) %>% as.numeric %>% avg()
   return(d2)
+}
+
+
+##' @export
+enlarge <- function(d){
+  d = d[,rep(1:ncol(d), each=2)]
+  d = d[rep(1:nrow(d), each=2), ]
+  return(d)
 }

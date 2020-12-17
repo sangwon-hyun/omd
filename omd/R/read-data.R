@@ -5,6 +5,8 @@
 ##' @param datadir Directory for data.
 ##'
 ##' @return Data that contains month, lat, lon, and some other data columns.
+##'
+##' @export
 read_data <- function(resolution = c("4", "2", "1", "0.5"),
                       type = c("Darwin", "Real"),
                       datadir = "/home/shyun/Dropbox/research/usc/ocean-provinces/omd/data"){
@@ -37,7 +39,7 @@ read_data <- function(resolution = c("4", "2", "1", "0.5"),
                 "tabulated_geospatial_montly_clim_180_360_ver_0_2.csv",
                 "tabulated_geospatial_montly_clim_360_720_ver_0_2.csv")
   filename = filenames[ind]
-  print(filename)
+  ## print(filename)
   dat = read.csv(file.path(datadir, filename))
   return(dat)
 }
@@ -52,6 +54,8 @@ read_data <- function(resolution = c("4", "2", "1", "0.5"),
 ##' @param latrange Latitude range.
 ##'
 ##' @return Processed data
+##'
+##' @export
 process_data <- function(dat, month, lonrange, latrange){
 
   ## Basic checks.
@@ -80,6 +84,8 @@ process_data <- function(dat, month, lonrange, latrange){
 ##'   values based on Chl, lat and lon.
 ##'
 ##' @return Matrix
+##'
+##' @export
 make_mat <- function(dat){
   ## dat = mydat[which(lonrange[1] < mydat[,"lon"] & mydat[, "lon"] < lonrange[2] &
   ##                    latrange[1] < mydat[,"lat"] & mydat[, "lat"] < latrange[2]),]
