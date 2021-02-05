@@ -235,3 +235,148 @@ enlarge <- function(d){
   d = d[rep(1:nrow(d), each=2), ]
   return(d)
 }
+
+
+
+##' A sliding window average, of window size (\code{size} x \code{size}).
+##'
+##' @param M Matrix.
+##' @param size Size of sliding window.
+##'
+##' @return Smoothed matrix of the same size
+##'
+##' @export
+smoothmat <- function(M, size){
+  delta = (size - 1) / 2
+  M_smoothed = OLIN::ma.matrix(M, av = "mean", delta = delta, edgeNA = FALSE ) ##%>% drawmat_precise()
+  stopifnot(all(dim(M_smoothed) == dim(M)))
+  return(M_smoothed)
+  ##   smoothie::kernel2dsmooth(M, kernel.type="boxcar", n=bw)  %>% drawmat_precise()
+}
+
+## smoothmat2 <- function(M, size){
+##   ## library(raster)
+##   ## M = M1
+##   ## r <- raster(M) # convert to rasterLayer
+##   ## w = focalWeight(r, 3, type='Gauss')
+##   ## obj = focal(r, w=w, padValue=0) %>% as.matrix()
+##   ## obj %>% drawmat_precise()
+
+##   ## sliding a 3x3 window
+##   r <- raster(M) # convert to rasterLayer
+##   stopifnot(size %% 2 == 1)
+##   mat = matrix(1, size, size)
+##   obj  = focal(r, mat, mean, pad = T, padValue = 0)
+##   agg <- as.matrix(obj)
+##   agg
+## }
+
+
+##' Drawing a 3d plot of a 2d matrix, where the Z values are the pixel values.
+##'
+##' @param M Matrix.
+##' @param zfac Factor for z limits for the 3d plots.
+##'
+##' @export
+drawmat_3d <- function(M, zfac = 30){
+
+  col.facet = level.colors(M, at = do.breaks(range(M), 20),
+                           col.regions = cm.colors,
+                           colors = TRUE)
+  col.facet = col.facet %>% adjustcolor(alpha.f = 0.9)
+  cloud(M,
+        panel.3d.cloud = panel.3dbars,
+        col="white",                      # white borders for bars
+        xbase = 1, ybase = 1,
+        zlim = c(min(M), max(M)) * zfac,                              # No space around the bars
+        scales = list(arrows = FALSE, just = "right"),
+        ## col.facet = "grey",
+        col.facet = col.facet,
+        screen = list(z = 65, x = -65),
+        xlim = c(-1, n+1),
+        ylim = c(-1,n+1),
+        ylab = "lat",
+        xlab = "lon",
+        zlab = NULL)
+}
+
+
+##' Helper to add dimension names to matrix \code{M}.
+##' @param M Matrix.
+##' @export
+add_dimnames <- function(M){
+  colnames(M) = sapply(1:ncol(M), toString)
+  rownames(M) = sapply(1:nrow(M), toString)
+  return(M)
+}
+
+
+
+##' Helper only used in \code{add_checkerboard}.
+##' @export
+cond <- function(input, div, remainders = 0, reverse = FALSE){
+  a = (input %% div) %in% remainders
+  ifelse(reverse, !a, a)
+}
+
+
+##' Helper to add global pattern.
+##' @export
+add_global <- function(M, sig, offset=0){
+  n = ncol(M)
+  M_add = matrix(-sig, nrow=n, ncol=n)
+  M_add[seq(n/2 + 1 + offset, n),] = sig
+  return(M + M_add)
+}
+
+##' Takes in a (2^k x 2^k) matrix, and adds a checkerboard pattern whose squares
+##' are sized \code{div}, by adding and minusing a value \code{sig} on the
+##' alternating checkboard colors.
+##'
+##' @param sig how much to add and subgract, in applying the checkerboard
+##'   pattern.
+##' @param div some power of 2 (i.e. 2^0, 2^1, ...), which is the size of the
+##'   checkerboard square you want to create.
+##' @param M original matrix to apply checkerboard pattern to.
+##'
+##' @return A matrix of the same size as the input \code{M}, but with a
+##'   checkerboard pattern mean added to it.
+##'
+##' @export
+add_checkerboard <- function(M, div, sig = 1){
+
+  ## Setup (very crude, since brain is lazy today)
+  div = div * 2
+  stopifnot(ncol(M) == nrow(M))
+  n = ncol(M)
+  stopifnot(div > 1)
+  stopifnot(round(log2(div), 1000) == log2(div))
+  stopifnot(round(log2(n), 1000) == log2(n))
+  remainder = 1: (div / 2)
+
+  ## Make checkberboard
+  ## for(reverse in c(TRUE, FALSE)){
+  M_add = matrix(-sig, ncol=n, nrow=n)
+  reverse=TRUE
+  for(ii in 1:n){
+    for(jj in 1:n){
+      for(reverse in c(TRUE, FALSE)){
+        if( ii %>% cond(div, remainder, reverse)  &  jj %>% cond(div, remainder, reverse)){
+          M_add[ii, jj] = sig
+        }
+      }
+    }
+  }
+  stopifnot(mean(M_add) == 0)
+  return(M + M_add)
+}
+
+##' Helper to make some colors.
+##' @export
+make_cols <- function(val){
+  col = val
+  col = col + min(col);
+  col = col/max(col)
+  col = sapply(col, function(a) rgb(0,0,1,a/2))
+  return(col)
+}

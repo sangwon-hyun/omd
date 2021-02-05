@@ -1,0 +1,10 @@
+#+TITLE:   Experiments & Notes
+
+Experiments and notes are placed here.
+
+Install the R package ~omd~ from the parent directory, then knit these Rmd files using:
+
+~Rscript -e 'rmarkdown::render("file.Rmd", "html_document")'~
+
+on the command line.
+
