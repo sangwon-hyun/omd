@@ -13,7 +13,7 @@ on the command line.
 To view the output html files properly, go to https://htmlpreview.github.io/, or
 just prepend it to the original URL:
 
-e.g. https://htmlpreview.github.io/?https://github.com/bartaz/impress.js/blob/master/index.html
+e.g. https://htmlpreview.github.io/?https://github.com/sangwon-hyun/omd/blob/master/notes/feb2-2021-experiments.html
 
 The data files should be downloaded from
 https://github.com/brorfred/ocean_clustering, and placed into ~../data~.
