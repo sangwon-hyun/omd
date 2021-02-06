@@ -1,0 +1,497 @@
+---
+title: "OMD multiscale comparison (cont'd from Sep 21)"
+author: "Sangwon Hyun, Jacob Bien, and the Ocean Provinces working group"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(fig.width = 14, fig.height=5, echo=TRUE, warning=FALSE,
+                      message=FALSE, eval=TRUE, cache=TRUE)
+knitr::opts_chunk$set(cache.path = "rmd-cache/nov-18-2020/")
+
+
+## Read in libraries
+library(Matrix)
+library(transport)
+library(rworldmap)
+library(viridis)
+library(dplyr)
+library(maps)
+library(omd) ## Import from destin
+destin = "."
+## destin = "~/Dropbox/research/usc/ocean-provinces/omd/" ##
+```
+
+
+# Sinkhorn's algorithm
+
+The Sinkhorn distance is an *approximation* to the Wasserstein's (Earthmover's)
+distance.
+
+Given a cost matrix $M$ that encodes the distance between each of the points in
+the departure and destination, and the mass $r$ in the departure, and $c$ in the
+destination, optimal transport is:
+
+$$d_M(\mathbf{r}, \mathbf{c}) = \min_{P\in U(\mathbf{r}, \mathbf{c})}\, \sum_{i,j}P_{ij}M_{ij}$$ 
+
+From this nice blogpost https://michielstock.github.io/OptimalTransport/, the
+optimization problem is modified to:
+
+
+$$ d_M^\lambda(\mathbf{r}, \mathbf{c}) = \min_{P\in U(\mathbf{r}, \mathbf{c})}\, \sum_{i,j}P_{ij}M_{ij} - \frac{1}{\lambda}h(P)$$
+
+whose penalty term
+
+$$h(P) = -\sum_{i,j}P_{ij}\log P_{ij}$$
+
+is the information entropy of P. One can increase the entropy by making the
+distribution more homogeneous. 
+
+The algorithm comes from observing that the optimum is of the form:
+
+$$(P_\lambda^\star)_{ij} = \alpha_i\beta_j e^{-\lambda M_{ij}}$$
+
+with $\alpha_i$ and $\beta_j$ that have to be determined such that the rows sum
+to $r$ and columns sum to $c$! 
+
+The algorithm is:
+
+---
+
+given: $M$, $r$, $c$ and \lambda$
+
+initialize: $P_\lambda = e^{-\lambda M}$
+
+repeat
+
+- scale the rows such that the row sums match r
+- scale the columns such that the column sums match c
+
+until convergence
+
+---
+
+
+We have so far been relying on the `transport` R package, which
+
+- Handles images on grids well (but data needs to be on equally spaced row and
+  column names).
+
+- Handles coordinates on a map well.
+
+- Algorithms used are hard to understand, and implemented piece-meal (some
+  combinations are not possible to run e.g. 1st power of Euclidean distance). I
+  got some hard-to-solve errors.
+
+- Speed seems very fast for images (on grids)
+
+Optimal distance on images (on grids) are handled well because they use a
+special algorithm that iterates from a coarser grid to a finer grid. From the
+package documentation:
+
+"For larger problems it is advisable to use the multiscale version, which
+currently is only implemented for square pgrids in two dimensions. The algorithm
+proceeds then by coarsening the pgrid nscales-1 times, summarizing each time
+scmult^2 pixels into one larger pixels, and then solving the various transport
+problems starting from the coarsest and using each previous problem to compute a
+starting solution to the next finer problem. If returncoarse is TRUE, the
+coarser problems and their solutions are returned as well (revsimplex only)."
+
+Now, using our own implementation is desirable because:
+
+- We have full control over the variants of proble.
+
+- We understand better the actual implementation (since we will have written
+  it).
+
+- There are even faster versions of the Sinkhorn we might be able to use. I've
+  only written up the simplest version.
+
+- If we accept some bias (by using lots of regularization), speed might be
+  comparable to the `transport` package.
+  
+    + It seems there is some variance introduced as well, when using more
+    regularization? This is a downside.
+	
++ More figures to describe this speed & bias tradeoff.
+	
+To add, I think I'd prefer to make my own plotting, instead of using the
+`transport` package's plot functions. This doesn't depend on using our own
+(e.g. Sinkhorn) implementation.
+
+# Trying out Sinkhorn
+
+```{r test-sinkhorn, fig.width=5, fig.height=5}
+## Setup
+delta = 10
+pp = 8
+lambda = 10
+costdiag = 10000
+
+set.seed(0)
+img1 = matrix(runif(pp^2), ncol=pp) 
+img2 = matrix(runif(pp^2), ncol=pp)
+lower_half = (pp/2 + 1):(pp)
+img2[lower_half, lower_half] = img2[lower_half, lower_half] + delta
+img1 = img1/sum(img1)
+img2 = img2/sum(img2)
+drawmat_precise(img1)
+drawmat_precise(img2)
+colnames(img1) = rownames(img1) = sapply(1:pp, toString)
+colnames(img2) = rownames(img2) = sapply(1:pp, toString)
+
+## Change format
+dat1 = image_to_long_format(img1)
+dat2 = image_to_long_format(img2)
+
+## Make cost matrix
+costm = form_cost_matrix(dat1)##^2
+diag(costm) = costdiag
+
+## Calculate sinkhorn
+tm = proc.time()
+sinkhorn_dist = sinkhorn(costm = costm, 
+                         invec = dat1 %>% pull(val),
+                         outvec = dat2 %>% pull(val),
+                         lambda = lambda,
+                         eps = 0.00001) %>% .[["dist"]]
+sinkhorn_time = (proc.time() - tm) %>% .["elapsed"] %>% unname()
+
+tm <- proc.time()
+res <- transport::transport(dat1 %>% pull(val),
+                            dat2 %>% pull(val),
+                            costm = costm)
+transportR_dist = transport::wasserstein(dat1 %>% pull(val),
+                                        dat2 %>% pull(val),
+                                        costm = costm,
+                                        tplan = res)
+transportR_time = (proc.time() - tm) %>% .["elapsed"] %>% unname()
+
+sinkhorn_dist %>% print()
+transportR_dist %>% print()
+```
+
+Now, running the simulation (using the same code from directly above):
+
+```{r sinkhorn-sim-driver}
+## Generate data
+onesim <- function(lambda,
+                   costdiag = 10000,
+                   pp = 4,
+                   nsim = 100,
+                   delta = 10){
+
+  info = sapply(1:nsim, function(iseed){
+    set.seed(iseed)
+    img1 = matrix(runif(pp^2), ncol=pp) 
+    img2 = matrix(runif(pp^2), ncol=pp)
+    lower_half = (pp/2 + 1):(pp)
+    img2[lower_half, lower_half] = img2[lower_half, lower_half] + delta
+    img1 = img1/sum(img1)
+    img2 = img2/sum(img2)
+    colnames(img1) = rownames(img1) = sapply(1:pp, toString)
+    colnames(img2) = rownames(img2) = sapply(1:pp, toString)
+    
+    ## Change format
+    dat1 = image_to_long_format(img1)
+    dat2 = image_to_long_format(img2)
+    
+    ## Make cost matrix
+    costm = form_cost_matrix(dat1)##^2
+    diag(costm) = costdiag
+    
+    ## Calculate sinkhorn
+    tm = proc.time()
+    sinkhorn_dist = sinkhorn(costm = costm, 
+                             invec = dat1 %>% pull(val),
+                             outvec = dat2 %>% pull(val),
+                             lambda = lambda,
+                             eps = 0.00001) %>% .[["dist"]]
+    sinkhorn_time = (proc.time() - tm) %>% .["elapsed"] %>% unname()
+    
+    tm <- proc.time()
+    res <- transport::transport(dat1 %>% pull(val),
+                                dat2 %>% pull(val),
+                                costm = costm)
+    transportR_dist = transport::wasserstein(dat1 %>% pull(val),
+                                            dat2 %>% pull(val),
+                                            costm = costm,
+                                            tplan = res)
+    transportR_time = (proc.time() - tm) %>% .["elapsed"] %>% unname()
+  
+    return(c(sinkhorn = sinkhorn_dist,
+             transportR = transportR_dist,
+             sinkhorn_time = sinkhorn_time,
+             transportR_time = transportR_time))
+  })
+  return(t(info))
+}
+```
+
+Running the simulation, for a range of lambda values `lams = c(0.1, 0.3, 0.5,
+0.8, 1, 2, 5, 10, 20)`:
+
+```{r sinkhorn-sim}
+lams = c(0.1, 0.3,  0.5, 0.8, 1, 2, 5, 10, 20)
+
+## Run simulations
+infolist = lapply(lams, function(lam){
+  info = onesim(lambda = lam, pp=8)
+}) %>% setNames(lams)
+```
+
+When we compare the OMDs of Sinkhorn distances to exact Wasserstein distances,
+we see that there's an induced bias for small values of `lambda`:
+
+```{r sinkhorn-accuracy, fig.width=10, fig.height=10}
+## Make plots speeds
+par(mfrow=c(3,3))
+Map(function(info, lam){
+  dists = info %>% as_tibble() %>% select(x=transportR, y=sinkhorn)
+  plot(x=dists$x, y=dists$y, xlab = "R transport package", ylab = "Sinkhorn distance")
+  abline(0,1)
+  title(main = paste0("lam = ", lam))
+}, infolist, lams) %>% invisible()
+```
+
+But for lower bias result, more computation is required:
+
+```{r sinkhorn-speed, fig.width=5, fig.height=5}
+## Get speeds
+timeslist = infolist %>% lapply(., function(info){
+  times = info %>% as_tibble() %>% select(contains("time")) %>% apply(.,2, median)
+})
+times = timeslist %>% do.call(rbind, .)
+matplot(y = times,
+        x = lams,
+        type='l', lwd=3, lty=1:2, col="black",
+        log = "x",
+        ylab = "Elapsed time (seconds)",
+        xlab = expression(lambda))
+legend("topleft", lwd = 3, lty = 1:2, col="black", legend = c("sinkhorn", "transport(R)"))
+```
+
+
+What about for a bigger images? Varying the image size to be `pp` by `pp`, for 
+`pp = c(4,6,8,10,15,20,30,40,50)`:
+
+```{r sinkhorn-sim-by-image-size, eval=FALSE}
+lams = c(0.1, 0.3,  0.5, 0.8, 1, 2, 5, 10, 20)
+## pps = c(4,6,8,10,15,20,30,40,50)
+pps = c(2,5,10,
+        15,20,30)
+
+list_of_infolist = mclapply(pps, function(pp){
+  print(pp)
+  infolist = mclapply(lams, function(lam){
+    info = onesim(lambda = lam, pp = pp, nsim = 30)
+  }, mc.cores = 8) %>% setNames(lams)
+  return(infolist)
+}, mc.cores = 1) %>% setNames(pps)
+
+saveRDS(list_of_infolist, file = file.path(destin, "list_of_infolist.RDS"))
+```
+
+```{r sinkhorn-plot-by-image-size, fig.width=8, fig.height=24, eval=TRUE}
+list_of_infolist = readRDS(file = file.path(destin, "list_of_infolist.RDS"))
+pps = c(2,5,10, 15,20,30)
+par(mfrow=c(6,2))
+for(pp in pps){
+
+  ## Results from a pp x pp image
+  infolist = list_of_infolist[[toString(pp)]]
+
+  ## Plot the times
+  timeslist = infolist %>% lapply(., function(info){
+    times = info %>% as_tibble() %>% select(contains("time")) %>% apply(.,2, median)
+  })
+  times = timeslist %>% do.call(rbind, .)
+  matplot(y = times,
+          x = lams,
+          type='l', lwd=3, lty=1:2, col="black",
+          log = "x",
+          ylab = "Elapsed time (seconds)",
+          xlab = expression(lambda))
+  legend("topleft", lwd = 3, lty = 1:2, col="black", legend = c("sinkhorn", "transport(R)"))
+  title(main = paste0("Elapsed time, size of image = ", pp, "x", pp))
+
+  ## Plot the intercepts, which kind of quantify the bias:
+  intercepts = sapply(infolist, function(info){
+    dists = info %>% as_tibble() %>% select(x=transportR, y=sinkhorn)
+    intercept = lm(y~x, data=dists) %>% coef() %>% .["(Intercept)"]
+    return(intercept)
+  })
+  plot(y=intercepts, x=lams, type='l', ylab = "bias", xlab = expression(lambda))
+  title(main = paste0("Bias, image size ", pp, "x", pp))
+
+  ## par(mfrow=c(3,3))
+  ## Map(function(info, lam){
+  ##   dists = info %>% as_tibble() %>% select(x=transportR, y=sinkhorn)
+  ##   plot(x=dists$x, y=dists$y, xlab = "R transport package", ylab = "Sinkhorn distance")
+  ##   abline(0,1)
+  ##   title(main = paste0("lam = ", lam))
+  ## }, infolist, lams) %>% invisible()
+}
+```
+
+
+# Apply to simulated data
+
+Let's examine coarsening vs. OMD again.
+
+```{r sim-helper}
+make_plist <- function(type = 1, keep_at_original_res = FALSE){
+  resol = 32
+  d1 = matrix(runif(resol^2), ncol=resol)
+  fac = 1
+  if(type==2) d1 = d1 + Matrix::bdiag(matrix(rep(fac,64), nrow=8), diag(rep(0,24))) %>% as.matrix()
+  rownames(d1) = colnames(d1) = c(1:resol) - 1
+  
+  ## Coarsen three times
+  d2 = avg_coarsen(d1) 
+  d3 = avg_coarsen(d2) 
+  d4 = avg_coarsen(d3) 
+
+  ## Enlarge
+  if(keep_at_original_res){
+    d2 = d2 %>% enlarge()
+    d3 = d3 %>% enlarge() %>% enlarge()
+    d4 = d4 %>% enlarge() %>% enlarge() %>% enlarge()
+    rownames(d4) = rownames(d3) = rownames(d2) = rownames(d1)
+    colnames(d4) = colnames(d3) = colnames(d2) = colnames(d1)
+  }
+
+  ## Now, apply splitting
+  p1 = d1 %>% make_pgrid()
+  p2 = d2 %>% make_pgrid()
+  p3 = d3 %>% make_pgrid()
+  p4 = d3 %>% make_pgrid()
+  return(list(p1=p1, p2=p2, p3=p3, p4=p4,
+              d1=d1, d2=d2, d3=d3, d4=d4))
+}
+```
+
+Taking 32 x 32 images and using a small block rised in the corner:
+
+```{r orig-res-viz}
+plist1 = make_plist(type = 1, keep_at_original_res = FALSE)
+plist2 = make_plist(type = 2, keep_at_original_res = FALSE)
+drawmat_precise(plist1$d1)
+drawmat_precise(plist2$d1)
+drawmat_precise(plist2$d2)
+drawmat_precise(plist2$d3)
+
+plist1 = make_plist(type = 1, keep_at_original_res = TRUE)
+plist2 = make_plist(type = 2, keep_at_original_res = TRUE)
+drawmat_precise(plist1$d1)
+drawmat_precise(plist2$d1)
+drawmat_precise(plist2$d2)
+drawmat_precise(plist2$d3)
+```
+
+Now, simulating this many times, we see that keeping the data the original pixel
+resolution keeps the OMD stable over coarsening.
+
+```{r orig-res-sim, fig.width=10, fig.height=10}
+par(mfrow = c(2,2))
+for(transportR in c(FALSE, TRUE)){
+  for(keep_res in c(FALSE, TRUE)){
+    transportR = FALSE
+    keep_res = FALSE
+  
+    nsim = 24
+    distlist = mclapply(1:nsim, function(isim){
+
+      plist1 = make_plist(type = 1, keep_at_original_res = keep_res)
+      plist2 = make_plist(type = 2, keep_at_original_res = keep_res)
+  
+      dists = c()
+      for(ii in 1:4){
+        if(transportR){
+          res <- transport::transport(plist1[[ii]], plist2[[ii]], p = 2, method = "aha")
+          dist = transport::wasserstein(plist1[[ii]], plist2[[ii]], p = 2, tplan = res)
+        } else {
+          
+          d1 = plist1[[ii+4]]
+          d2 = plist2[[ii+4]]
+          d1 = d1/sum(d1)
+          d2 = d2/sum(d2)
+          dat1 = image_to_long_format(d1)
+          dat2 = image_to_long_format(d2)
+          
+          ## Make cost matrix
+          costm = form_cost_matrix(dat1)#^2
+          diag(costm) = 1E6
+          
+          ## Calculate sinkhorn
+          lambda = 10
+          dist = sinkhorn(costm = costm, 
+                          invec = dat1 %>% pull(val),
+                          outvec = dat2 %>% pull(val),
+                          lambda = lambda,
+                          eps = 0.00001) %>% .[["dist"]]
+        }
+        dists[ii] = dist
+      }
+      return(dists)
+    }, mc.cores = 8)
+    distmat = distlist %>% do.call(rbind, .)
+
+    ## Make the OMD vs Resolution plots
+    mns = distmat %>% apply(., 2, mean)
+    sds = distmat %>% apply(., 2, sd)
+    x = c(32, 16, 8, 4)
+    plot(y=mns, x=x, ylim = range(mns-sds, mns+sds), pch = 16, cex=2, type='o',
+         xlab = "How many pixels on each axis \n (Small = coarse)",
+         ylab = "OMD")
+    matpoints(y = t(distmat),
+              x = x,
+              type='o', pch=16, lwd=0.5,
+              col = 'grey80')
+    arrows(x, mns-sds, x, mns+sds, length=0.05, angle=90, code=3, lwd=2)
+    
+    main = ifelse(keep_res,
+                  "When coarsening, \nkeep original resolution 32 x 32",
+                  "When coarsening, \ndrop resolution to 16 x 16, 8 x 8, etc.")
+    main = ifelse(transportR, main, paste0("SINKHORN: ", main))
+    title(main = main)
+  }
+}
+```
+
+(In the above plot, ignore the left-hand-side Sinkhorn plot, whose resulting
+distances seem to be odd. Note to self: At the coarsest resolution `ii=4`, there
+seems to be some odd behavior going on; when the diagonal entries of `costm` are
+set equal to anything lower than 8, then the transport is equal to that value;
+when it's larger (up to 1E8, say), then the transport seems to be capped at 8.)
+
+
+# Misc. code
+
+```{r}
+drawmat_precise(costm)
+```
+
+<!-- # Apply to real data -->
+
+
+<!-- * Take the (Darwin) Chlorophyll data in a region in the North Pacific. -->
+
+<!-- ```{r read-data, eval=FALSE} -->
+<!-- resolution = "2" -->
+<!-- type = "Darwin" -->
+<!-- dat =  read_data(resolution = resolution, type = type) -->
+<!-- drawmat_precise(dat %>% process_data(mo1, lonrange, latrange)) -->
+<!-- ``` -->
+
+
+<!-- **We'll try the original-scale analysis** i.e. don't bring down a 10 x 10 -->
+<!-- image to 5 x 5 image when averaging; keep it at a 10 x 10 image. -->
+
+
+<!-- ```{r} -->
+<!-- ``` -->

@@ -1,0 +1,198 @@
+---
+title: "Learning more about Sinkhorn (Continue from Jan 20th 2021)"
+author: "Sangwon Hyun, Jacob Bien, and the Ocean Provinces working group"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(fig.width = 7, fig.height=7, echo=TRUE, warning=FALSE,
+                      message=FALSE, eval=TRUE, cache=TRUE)
+knitr::opts_chunk$set(cache.path = "rmd-cache/feb2-2021/")
+```
+
+# Load libraries
+
+```{r}
+## Read in libraries
+library(latticeExtra) 
+library(Matrix)
+library(transport)
+library(dplyr)
+library(omd)
+## la("omd") ## Import from destin
+## destin = "~/Dropbox/research/usc/ocean-provinces/omd/" ##
+```
+
+# Summary
+
+Last time, we saw how experiments might apply to a checkerboard pattern
+(global + local change).
+
+In this document, we fix an error of mine (of discouraging mass from staying
+put), and then improve Sinkhorn by changing the convergence criterion of the
+algorithm to be relative.
+
+
+
+# Data
+
+We'll be comparing two images, from these mean images:
+
+```{r, fig.width=5, fig.height=5}
+## Generate means
+n = 2^3
+M_mean = matrix(0, ncol = n, nrow=n)
+sig = 1
+M1_mean = M_mean %>% add_global(2) %>% add_checkerboard(2, sig) 
+M2_mean = M_mean %>% add_global(2)
+M1_mean = M1_mean + 5
+M2_mean = M2_mean + 5
+stopifnot(all(dim(M1_mean)==dim(M2_mean)))
+M1_mean %>% drawmat_precise()
+M2_mean %>% drawmat_precise()
+```
+
+# Sinkhorn, visualized by iteration
+
+We're stopping when maximum of row sums doesn't change that much (1E-14).
+
+```{r, fig.width=7, fig.height=7}
+set.seed(10)
+sigma = .5
+M1 = M1_mean + rnorm(length(M1_mean), 0, sigma)
+M2 = M2_mean + rnorm(length(M2_mean), 0, sigma) 
+res <- omd(M1, M2, type = "sinkhorn")
+
+## Plot two quantities over iterations
+par(mfrow = c(2, 1), mar = c(5,5,2,2))
+gridcol = rgb(0,0,0,0.2)
+na.omit(res$sinkhorn_object$gaps) %>% log10() %>% plot(type='l', pch=16, cex=.5, log="x",
+                                                       xlab = "Sinkhorn iteration", ylab = "log10(row sum difference from \n previous iteration)")
+abline(h=seq(from=-20, to=0, by = 1), col = gridcol)
+abline(v=seq(from=0, to=100000, by = 100), col = gridcol)
+abline(h=-14, lwd=2, col='red')
+
+na.omit(res$sinkhorn_object$dists) %>%  plot(type='l', pch=16, cex=.5, log="x",
+                                                       xlab = "Sinkhorn iteration", ylab = "OMD")
+abline(h=seq(from=1E-15, to=1, by = 1E-2), col = gridcol)
+abline(v=seq(from=0, to=100000, by = 100), col = gridcol)
+```
+
+# Sinkhorn with relative stopping
+
+Instead of an absolute for the criterion (1E-15), how about if we used
+stabilization of the distances? Cuts down on run time.
+
+(Red line is absolute threshold for row sum difference across iterations)
+
+(Blue line is time used by transport R package)
+
+```{r}
+sinkhorn_rel_eps = NULL
+
+set.seed(10)
+sigma = .5
+M1 = M1_mean + rnorm(length(M1_mean), 0, sigma)
+M2 = M2_mean + rnorm(length(M2_mean), 0, sigma) 
+
+before_time = Sys.time()
+transportR_dist <- omd(M1, M2, type = "transport")$dist
+after_time = Sys.time()
+transport_lapse_time = (after_time - before_time) %>% as.numeric() %>% round(3)
+
+## Initialize container
+sinkhorn_rel_eps_list =  c(NA, 1E-10, 1E-8, 1E-7, 1E-6, 1E-4)
+reslist = vector(mode="list", length=6)
+lapse_times = rep(NA, 6)
+
+## Calculate Sinkhorn Distance
+for(ii in 1:6){
+  sinkhorn_rel_eps = sinkhorn_rel_eps_list[ii]
+  before_time = Sys.time()
+  if(is.na(sinkhorn_rel_eps)) sinkhorn_rel_eps = NULL
+  res <- omd(M1, M2, type = "sinkhorn", sinkhorn_rel_eps = sinkhorn_rel_eps)
+  reslist[[ii]] = res
+  lapse_times[[ii]] = (Sys.time() - before_time) %>% as.numeric() %>% round(3)
+}
+```
+
+```{r, fig.width=7, fig.height=14}
+## Plot two quantities over iterations
+par(mfrow = c(6, 2), mar = c(5,5,2,2))
+sinkhorn_rel_eps_list =  c(NA, 1E-10, 1E-8, 1E-7, 1E-6, 1E-4)
+for(ii in 1:6){
+  gridcol = rgb(0,0,0,0.2)
+  sinkhorn_rel_eps = sinkhorn_rel_eps_list[ii]
+  res = reslist[[ii]]
+  na.omit(res$sinkhorn_object$gaps) %>% log10() %>% plot(type='l', pch=16, cex=.5, log="x",
+                                                         xlab = "Sinkhorn iteration", ylab = "log10(row sum difference from \n previous iteration)")
+  abline(h=seq(from=-20, to=0, by = 1), col = gridcol)
+  abline(v=seq(from=0, to=100000, by = 100), col = gridcol)
+  abline(h=-14, lwd=2, col='red')
+  
+  na.omit(res$sinkhorn_object$dists) %>%  plot(type='l', pch=16, cex=.5, log="x",
+                                               xlab = "Sinkhorn iteration", ylab = "OMD",
+                                               ylim = c(0, transportR_dist))
+  abline(h = transportR_dist, col = "blue", lwd=2)
+  abline(h=seq(from=1E-15, to=1, by = 1E-2), col = gridcol)
+  abline(v=seq(from=0, to=100000, by = 100), col = gridcol)
+  legend("topleft", legend = paste("rel. stop = ", sinkhorn_rel_eps), cex=1.5, bty="n")
+
+  ## measure time
+  legend("bottomright", legend = paste0("run time = ", lapse_times[ii], "\n",
+                                        "transportR run time = ", transport_lapse_time), cex=1.5, bty="n")
+}
+```
+
+# Sinkhorn as a function of the regularization parameter
+
+Next, as a function of lambda, how does this hold up? Let's see
+
+- The (dis) agreement between Sinkhorn and software from `transport` R package.
+
+- Run time.
+
+```{r, fig.width=5, fig.height=10}
+sigma = .5
+nsim = 30
+par(mfrow=c(4,1))
+for(sinkhorn_lambda in c(5, 10, 20, 30)){
+  dists = mclapply(1:nsim, function(isim){
+    printprogress(isim, nsim)
+    set.seed(isim * sinkhorn_lambda)
+  
+    ## Add noise
+    M1 = M1_mean + rnorm(length(M1_mean), 0, sigma)
+    M2 = M2_mean + rnorm(length(M2_mean), 0, sigma) 
+    
+    ## Calculate the two distances
+    costm <- omd(M1, M2, type="transport")$costm
+
+    before_time = Sys.time()
+    transportR_dist <- omd(M1, M2, costm = costm, type="transport")$dist
+    transport_time = (Sys.time() - before_time) %>% as.numeric() %>% round(3)
+
+    before_time = Sys.time()
+    sinkhorn_dist <- omd(M1, M2, costm = costm, type = "sinkhorn", sinkhorn_rel_eps = 1E-6, sinkhorn_lambda = sinkhorn_lambda)$dist
+    sinkhorn_time = (Sys.time() - before_time) %>% as.numeric() %>% round(3)
+  
+    return(c(sinkhorn = sinkhorn_dist, transport = transportR_dist, sinkhorn_time = sinkhorn_time, transport_time = transport_time))
+  }, mc.cores = 8)
+  
+  distmat = do.call(rbind, dists) %>% as_tibble()
+  plot(y = distmat$transport,
+       x = distmat$sinkhorn,
+       xlab = "sinkhorn", ylab = "transport (exact)", log="xy")
+  title(main = paste0("lambda = ", sinkhorn_lambda))
+  distmat$sinkhorn_time %>% mean() %>% round(3) %>% paste0("sinkhorn time=", .) %>% legend("topleft", legend=., bty="n")
+  distmat$transport_time %>% mean() %>% round(3)%>% paste0("transport time=", .) %>% legend("bottomright", legend=., bty="n")
+  abline(0,1)
+
+}
+```
+
+<div class="tocify-extend-page" data-unique="tocify-extend-page" style="height: 0;"></div>

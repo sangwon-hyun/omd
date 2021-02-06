@@ -4,7 +4,18 @@ Experiments and notes are placed here.
 
 Install the R package ~omd~ from the parent directory, then knit these Rmd files using:
 
-~Rscript -e 'rmarkdown::render("file.Rmd", "html_document")'~
+#+begin_src 
+Rscript -e 'rmarkdown::render("file.Rmd", "html_document")'
+#+end_src
 
 on the command line.
+
+To view the output html files properly, go to https://htmlpreview.github.io/, or
+just prepend it to the original URL:
+
+e.g. https://htmlpreview.github.io/?https://github.com/bartaz/impress.js/blob/master/index.html
+
+The data files should be downloaded from
+https://github.com/brorfred/ocean_clustering, and placed into ~../data~.
+
 
