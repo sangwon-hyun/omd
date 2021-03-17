@@ -248,28 +248,103 @@ enlarge <- function(d){
 ##' @export
 smoothmat <- function(M, size){
   delta = (size - 1) / 2
-  M_smoothed = OLIN::ma.matrix(M, av = "mean", delta = delta, edgeNA = FALSE ) ##%>% drawmat_precise()
+  M_smoothed = ma.matrix(M, av = "mean", delta = delta, edgeNA = FALSE) ##%>% drawmat_precise()
   stopifnot(all(dim(M_smoothed) == dim(M)))
   return(M_smoothed)
   ##   smoothie::kernel2dsmooth(M, kernel.type="boxcar", n=bw)  %>% drawmat_precise()
 }
 
-## smoothmat2 <- function(M, size){
-##   ## library(raster)
-##   ## M = M1
-##   ## r <- raster(M) # convert to rasterLayer
-##   ## w = focalWeight(r, 3, type='Gauss')
-##   ## obj = focal(r, w=w, padValue=0) %>% as.matrix()
-##   ## obj %>% drawmat_precise()
 
-##   ## sliding a 3x3 window
-##   r <- raster(M) # convert to rasterLayer
-##   stopifnot(size %% 2 == 1)
-##   mat = matrix(1, size, size)
-##   obj  = focal(r, mat, mean, pad = T, padValue = 0)
-##   agg <- as.matrix(obj)
-##   agg
-## }
+##' Helper function taken directly from the OLIN package. Takes a sliding window
+##' average i.e. (j,k)'th pixel's value is taken from a square window extending
+##' +-delta out in either direction. When the window of size (delta*2+1) x
+##' (delta*2+1) centered at (j,k) tries to extend to outside of the matrix, it's
+##' not allowed to. This is equal to a local regression of zero'th order.
+##'
+##' @param X Data matrix
+##' @param av What function to use for summarizing. Defaults to median.
+##' @param delta Window size.
+##' @param edgeNA if TRUE, then any pixel whose (delta*2+1) x (delta*2+1) window
+##'   extends outside of the matrix is assigned zero.
+##'
+##' @export
+ma.matrix <- function (X, av = "median", delta = 2, edgeNA = FALSE)
+{
+    Xav <- matrix(NA, nrow = dim(X)[[1]], ncol = dim(X)[[2]])
+    if (av == "mean") {
+        average <- mean
+    }
+    else {
+        average <- median
+    }
+    #### SLIDING WINDOW
+    for (j in 1:dim(X)[[1]]) {
+        for (k in 1:dim(X)[[2]]) {
+            a <- (j - delta)
+            c <- (j + delta)
+            b <- (k - delta)
+            d <- (k + delta)
+            if (a < 1) {
+                a <- 1
+                c <- 2 * delta + 1
+            }
+            if (b < 1) {
+                b <- 1
+                d <- 2 * delta + 1
+            }
+            if (c > dim(X)[[1]]) {
+                a <- dim(X)[[1]] - 2 * delta
+                c <- dim(X)[[1]]
+            }
+            if (d > dim(X)[[2]]) {
+                b <- dim(X)[[2]] - 2 * delta
+                d <- dim(X)[[2]]
+            }
+            Xav[j, k] <- average(X[a:c, b:d], na.rm = TRUE)
+        }
+    }
+
+    ### TREATMENT OF EDGES
+    if (edgeNA) {
+        Xav[1:(delta), ] <- NA
+        Xav[, 1:(delta)] <- NA
+        Xav[, (dim(Xav)[[2]] - delta + 1):dim(Xav)[[2]]] <- NA
+        Xav[(dim(Xav)[[1]] - delta + 1):dim(Xav)[[1]], ] <- NA
+    }
+    Xav
+}
+
+
+##' Nonoverlapping matrix average.
+##'
+##' @param window (window x window) sized non-overlapping bins.
+##' @param m matrix
+##'
+##' @return Matrix of same size but with non-overlapping average.
+##' @export
+##'
+##' @examples \dontrun{
+##' m = matrix(rnorm(100), nrow=10, ncol=10)
+##' stopifnot(all(m %>% bin_matrix(1) == m))
+##' }
+binmat <- function(m, window){
+  nr = nrow(m)
+  nc = ncol(m)
+  ir = c(seq(from=1, to=nr, by=window), nr+1) %>% unique()
+  ic = c(seq(from=1, to=nc, by=window), nc+1) %>%unique()
+  new_m <- matrix(NA, nr, nc)
+  for(iir in 1:(length(ir)-1)){
+    for(iic in 1:(length(ic)-1)){
+      jr = ir[iir]
+      jc = ic[iic]
+      jr_next = ir[iir+1]-1
+      jc_next = ic[iic+1]-1
+      new_m[jr:jr_next, jc:jc_next] = mean(m[jr:jr_next, jc:jc_next])
+    }
+  }
+  return(new_m)
+}
+
 
 
 ##' Drawing a 3d plot of a 2d matrix, where the Z values are the pixel values.
@@ -372,6 +447,7 @@ add_checkerboard <- function(M, div, sig = 1){
 }
 
 ##' Helper to make some colors.
+##'
 ##' @export
 make_cols <- function(val){
   col = val
@@ -379,4 +455,34 @@ make_cols <- function(val){
   col = col/max(col)
   col = sapply(col, function(a) rgb(0,0,1,a/2))
   return(col)
+}
+
+
+##' Fill in empty by taking the average of the 4 x 4 window around it.
+##'
+##' @param mat Matrix.
+##' @param wind Window size, defaults to 4.
+##'
+##' @return Matrix of same size as \code{mat}.
+##' @export
+fill_in_empty <- function(mat, wind = 4){
+  na.ind = which(is.na(mat), arr.ind=TRUE)
+  new_mat = mat
+  if(length(na.ind) > 0){
+    for(ii in 1:nrow(na.ind)){
+      ind = na.ind[ii,]
+      rows = ind["row"] + (-wind):wind
+      cols = ind["col"] + (-wind):wind
+      rows = rows %>% pmin(nrow(mat))
+      cols = cols %>% pmin(ncol(mat))
+      rows = rows %>% pmax(1) %>% unique()
+      cols = cols %>% pmin(1) %>% unique()
+      ## print('before')
+      ## new_mat[ind["row"], ind["col"]] %>% print()
+      new_mat[ind["row"], ind["col"]] = mean(mat[rows, cols], na.rm=TRUE)
+      ## print('after')
+      ## new_mat[ind["row"], ind["col"]] %>% print()
+    }
+  }
+  return(new_mat)
 }

@@ -12,6 +12,7 @@ omd(
   M1_long = NULL,
   M2_long = NULL,
   type = c("transport", "sinkhorn"),
+  p = 1,
   sinkhorn_lambda = 30,
   sinkhorn_eps = 1e-15,
   sinkhorn_rel_eps = NULL

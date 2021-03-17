@@ -5,7 +5,7 @@
 \title{Converts a matrix with `n` rows and with columns `lat`, `lon`, into a cost
 matrix of size (n x n).}
 \usage{
-form_cost_matrix(dat)
+form_cost_matrix(dat, pow = 2)
 }
 \arguments{
 \item{Matrix}{whose rows are data points, and columns are named "lat" and

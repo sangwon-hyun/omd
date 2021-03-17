@@ -11,6 +11,7 @@
 ##' @export
 omd <- function(M1, M2, costm = NULL, M1_long = NULL, M2_long = NULL,
                 type = c("transport", "sinkhorn"),
+                p = 1,
                 sinkhorn_lambda = 30,
                 sinkhorn_eps = 1E-15,
                 sinkhorn_rel_eps = NULL
@@ -33,7 +34,7 @@ omd <- function(M1, M2, costm = NULL, M1_long = NULL, M2_long = NULL,
   if(is.null(M2_long)) M2_long = image_to_long_format(M2)
 
   ## Make cost matrix
-  if(is.null(costm)) costm = form_cost_matrix(M1_long)
+  if(is.null(costm)) costm = form_cost_matrix(M1_long, pow = p)
 
   if(type == "sinkhorn"){
 
@@ -62,7 +63,9 @@ omd <- function(M1, M2, costm = NULL, M1_long = NULL, M2_long = NULL,
   obj = list(dist = dist,
              transport_object = transport_res,
              sinkhorn_object = sinkhorn_res,
-             costm = costm)
+             costm = costm,
+             M1_long = M1_long,
+             M2_long = M2_long)
   return(obj)
 }
 
@@ -78,11 +81,11 @@ omd <- function(M1, M2, costm = NULL, M1_long = NULL, M2_long = NULL,
 ##' @return p x p cost matrix.
 ##'
 ##' @export
-form_cost_matrix <- function(dat){
+form_cost_matrix <- function(dat, pow=2){
   ## dat = image_to_long_format(img1)
   stopifnot("lat" %in% colnames(dat))
   stopifnot("lon" %in% colnames(dat))
-  return(dat %>% dplyr::select(lat, lon) %>% dist(p=2) %>% as.matrix())
+  return(dat %>% dplyr::select(lat, lon) %>% dist(p=pow) %>% as.matrix())
 }
 
 
