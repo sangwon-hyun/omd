@@ -36,15 +36,7 @@ plot_vf <- function(jan.dat, feb.dat, res){
   masses = masses / max(masses) * 10
   for (ii in 1:length(from_indices)){
     if(ii %in% nomove) next
-    ## segments(jan.dat[from_indices[i], 'lon'],
-    ##          feb.dat[from_indices[i], 'lat'],
-    ##          jan.dat[to_indices[i], 'lon'],
-    ##          feb.dat[to_indices[i], 'lat'],
-    ##          lty = 1,
-    ##          lwd = 0.5)
-
     shift = rnorm(1,0,0.1)
-    ## shift = 0
 
     yco <- rev(gg[, 1])
     xco <- gg[, 2]
@@ -55,15 +47,6 @@ plot_vf <- function(jan.dat, feb.dat, res){
            xco[rs$to[whi]], yco[rs$to[whi]], angle = 5,
            length, col = arrcols[whi], lwd = lwd)
     }
-
-    ## arrows(x0=jan.dat[from_indices[ii], 'lon'] + shift,
-    ##        y0=jan.dat[from_indices[ii], 'lat'] + shift,
-    ##        x1=feb.dat[to_indices[ii], 'lon']   + shift,
-    ##        y1=feb.dat[to_indices[ii], 'lat']   + shift,
-    ##        length = 0.1,
-    ##        lwd = 1)
-           ## lty = 1,
-           ## lwd = masses[ii])
   }
 
   return(res)

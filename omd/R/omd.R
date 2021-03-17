@@ -45,7 +45,7 @@ omd <- function(M1, M2, costm = NULL, M1_long = NULL, M2_long = NULL,
                              lambda = sinkhorn_lambda,
                              eps = sinkhorn_eps,
                              rel_eps = sinkhorn_rel_eps)
-    dist = sinkhorn_res$dist
+    dist = (sinkhorn_res$dist)^(1/p)
     transport_res = NULL
   }
   if(type == "transport"){
