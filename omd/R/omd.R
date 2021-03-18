@@ -34,25 +34,26 @@ omd <- function(M1, M2, costm = NULL, M1_long = NULL, M2_long = NULL,
   if(is.null(M2_long)) M2_long = image_to_long_format(M2)
 
   ## Make cost matrix
-  if(is.null(costm)) costm = form_cost_matrix(M1_long, pow = p)
+  if(is.null(costm)) costm = form_cost_matrix(M1_long)
+  costm = costm^p
 
   if(type == "sinkhorn"){
 
     ## Calculate sinkhorn
-    sinkhorn_res = sinkhorn(costm = costm,
-                             invec = M1_long %>% pull(val),
-                             outvec = M2_long %>% pull(val),
-                             lambda = sinkhorn_lambda,
-                             eps = sinkhorn_eps,
-                             rel_eps = sinkhorn_rel_eps)
+    sinkhorn_res = sinkhorn(costm = costm^p,
+                            invec = M1_long %>% pull(val),
+                            outvec = M2_long %>% pull(val),
+                            lambda = sinkhorn_lambda,
+                            eps = sinkhorn_eps,
+                            rel_eps = sinkhorn_rel_eps)
     dist = (sinkhorn_res$dist)^(1/p)
     transport_res = NULL
   }
   if(type == "transport"){
 
     transport_res <- transport::transport(M1_long %>% pull(val),
-                                M2_long %>% pull(val),
-                                costm = costm)
+                                          M2_long %>% pull(val),
+                                          costm = costm)
     dist = transport::wasserstein(M1_long %>% pull(val),
                                   M2_long %>% pull(val),
                                   costm = costm,
@@ -60,7 +61,7 @@ omd <- function(M1, M2, costm = NULL, M1_long = NULL, M2_long = NULL,
     sinkhorn_res = NULL
   }
 
-  obj = list(dist = dist,
+  obj = list(dist = dist^(1/p),
              transport_object = transport_res,
              sinkhorn_object = sinkhorn_res,
              costm = costm,
@@ -81,11 +82,11 @@ omd <- function(M1, M2, costm = NULL, M1_long = NULL, M2_long = NULL,
 ##' @return p x p cost matrix.
 ##'
 ##' @export
-form_cost_matrix <- function(dat, pow=2){
+form_cost_matrix <- function(dat){
   ## dat = image_to_long_format(img1)
   stopifnot("lat" %in% colnames(dat))
   stopifnot("lon" %in% colnames(dat))
-  return(dat %>% dplyr::select(lat, lon) %>% dist(p=pow) %>% as.matrix())
+  return(dat %>% dplyr::select(lat, lon) %>% dist() %>% as.matrix())
 }
 
 

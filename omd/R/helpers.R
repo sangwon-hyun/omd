@@ -143,7 +143,7 @@ get_surround <- function(data, index, type="all"){
 ##' Taken from Justin's convenience functions..
 ##'
 ##' @export
-drawmat_precise <- function(mat, contour = FALSE, ...){
+drawmat_precise <- function(mat, contour = FALSE, colfun = NULL, num_color_ramp = 100, ...){
 
 ## Dummy data
 ## data <- matrix(runif(100, 0, 5) , 10 , 10)
@@ -156,11 +156,13 @@ drawmat_precise <- function(mat, contour = FALSE, ...){
   }
 
   ## Color function
-  colfun = colorRampPalette(c("blue", "red"))
+  if(is.null(colfun)){
+    colfun = colorRampPalette(c("blue", "red"))
+  }
 
   # plot it flipping the axis
   lattice::levelplot(t(mat[c(nrow(mat):1) , ]),
-                     col.regions = colfun(100),
+                     col.regions = colfun(num_color_ramp),
                      contour = contour,
                      ## xaxt = 'n',
                      las = 2,
@@ -469,3 +471,33 @@ fill_in_empty <- function(mat, wind = 4){
   }
   return(new_mat)
 }
+
+
+
+##' Takes data that contains "month", "lon" and "lat" as columns, and isolates
+##' it to one month \code{mo} and to a latitude/longitutde range \code{lonrange}
+##' and \code{latrange}.
+##'
+##' @param dat data matrix. Must include "lat" "lon" and "month"
+##' @param mo Month.
+##' @param latrange Latitude range.
+##' @param lonrange Longitude range.
+##'
+##' @export
+get_time_space_box <- function(dat, mo, latrange, lonrange, fill_na = FALSE){
+
+  ##latmin, latmax, lonmin, lonmax){
+  stopifnot(length(mo)==1)
+  stopifnot(mo %in% 1:12)
+  ## lonrange = c(lonmin, lonmax)
+  ## latrange = c(latmin, latmax)
+  dat = dat %>% subset(month %in% mo) %>% filter(lonrange[1] < lon,
+                                                 lon < lonrange[2],
+                                                 latrange[1] < lat,
+                                                 lat < latrange[2]) %>%
+    make_mat()
+  if(fill_na) dat = dat %>% fill_in_empty(2)
+  return(dat)
+}
+
+

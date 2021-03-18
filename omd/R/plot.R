@@ -1,7 +1,8 @@
-##' Base R plotting of the optimal transport
-##'  d = 1
+##' Base R plotting of the optimal transport.
+##'
 ##' @export
-plot_omd <- function(obj, lwd_max = 10, cex_dat = 2){
+plot_omd <- function(obj, lwd_max = 10, cex_dat = 2, colfun = NULL){
+
 
   ## Get all the transfers
   mat = obj$transport_obj
@@ -13,40 +14,27 @@ plot_omd <- function(obj, lwd_max = 10, cex_dat = 2){
   nr = max(obj$M2_long$lat)
 
   par(mfrow=c(1,3))
-  cols = obj$M1_long[,"val"] %>% pmax(0)
-  cols = cols/maxcol
-  cols = sapply(cols, function(col) rgb(0,0,0,col))
-  plot(x = obj$M1_long[,"lon"],
-       y = nr-obj$M1_long[,"lat"],
-       col = cols,
-       pch = 15, cex=cex_dat,
-       xlab = "",
-       ylab = "")
-  title(main = "From")
+  base_r_plot(obj$M1_long[,"lon"],
+              obj$M1_long[,"lat"],
+              max(obj$M1_long[,"lat"]),
+              val = obj$M1_long[,"val"],
+              main = "From")
 
-  cols = obj$M2_long[,"val"] %>% pmax(0)
-  cols = cols/maxcol
-  cols = sapply(cols, function(col) rgb(0,0,0,col))
-  plot(x = obj$M2_long[,"lon"],
-       y = nr-obj$M2_long[,"lat"],
-       col = cols,
-       pch = 15, cex=cex_dat,
-       xlab = "",
-       ylab = "")
-  title(main = "To")
+  base_r_plot(obj$M2_long[,"lon"],
+              obj$M2_long[,"lat"],
+              max(obj$M2_long[,"lat"]),
+              val = obj$M2_long[,"val"],
+              main = "To")
 
-  cols = obj$M1_long[,"val"] %>% pmax(0)
-  cols = cols/maxcol
-  cols = sapply(cols, function(col) rgb(0,0,0,col))
-  plot(x = obj$M1_long[,"lon"],
-       y = nr-obj$M1_long[,"lat"],
-       col = cols,
-       pch = 15, cex=cex_dat,
-       xlab = "",
-       ylab = "")
-  title(main = "Mass transports")
+  bw_colfun <- function(cols){ cols %>% sapply(., function(col)rgb(0, 0, 0, col))}
+  base_r_plot(obj$M1_long[,"lon"],
+              obj$M1_long[,"lat"],
+              max(obj$M1_long[,"lat"]),
+              val = obj$M1_long[,"val"],
+              main = "Mass transports",
+              colfun = bw_colfun)
 
-  ## Add the colors
+  ## Add the Arrows
   lwd = mat[,"mass"]
   lwd = lwd/max(lwd)*lwd_max
   for(ii in 1:nrow(mat)){
@@ -58,12 +46,7 @@ plot_omd <- function(obj, lwd_max = 10, cex_dat = 2){
     ## Map the transfers
     coord_from = obj$M1_long[one_transfer[,"from"], c("lon", "lat")]
     coord_to = obj$M1_long[one_transfer[,"to"], c("lon", "lat")]
-    ## if(one_transfer[,"mass"] > cutoff){
-    ##   col = 'red'
-    ## } else {
-    ##   col = 'green'
-    ## }
-    ## lines(rbind(coord_from, coord_to), lwd=2, col="red" %>% adjustcolor(alpha = 0.5))
+
     if(all(coord_from == coord_to)) browser()
     ## if(x0 == x1 & y0 == y1) browser()
     arrows(x0 = coord_from[,'lon'], y0 = nr-coord_from[,'lat'],
@@ -72,4 +55,39 @@ plot_omd <- function(obj, lwd_max = 10, cex_dat = 2){
            length = 0.1/2,
            lwd = lwd[ii])
   }
+}
+
+
+
+##' Base R plot.
+##' @export
+base_r_plot <- function(lon, lat, maxlat, val, colfun = NULL, maxcol = NULL,
+                        cex_dat = 3,
+                        ...){
+
+  ## Setup
+  if(is.null(maxcol)){ maxcol = max(val) }
+
+  ## Define color function.
+  if(is.null(colfun)){
+    ramp <- colorRamp(c("blue", "red"))
+    colfun <- function(cols){
+      ramp(cols) %>% apply(1, function(r.g.b)rgb(r.g.b[1], r.g.b[2], r.g.b[3], max = 255))
+    }
+  }
+
+  ## Define color function.
+  ## val = obj$M1_long[,"val"]
+  cols = val %>% pmax(0)
+  cols = (cols/maxcol) %>% colfun()
+
+  ## Longitude
+  plot(x = lon,
+       y = maxlat - lat,
+       col = cols,
+       pch = 15,
+       cex = cex_dat,
+       xlab = "",
+       ylab = "",
+       ...)
 }
