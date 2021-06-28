@@ -18,7 +18,6 @@
 sinkhorn <- function(costm, lambda, invec, outvec,
                      eps = 1E-3, rel_eps = 1E-8,
                      niter = 1E5){
-
   ## Basic checks
   check_sinkhorn_inputs(costm, lambda, invec, outvec)
 

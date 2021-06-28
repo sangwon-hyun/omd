@@ -6,11 +6,12 @@
 to 1.}
 \usage{
 omd(
-  M1,
-  M2,
+  M1 = NULL,
+  M2 = NULL,
   costm = NULL,
   M1_long = NULL,
   M2_long = NULL,
+  coordnames = c("lon", "lat"),
   type = c("transport", "sinkhorn"),
   p = 1,
   sinkhorn_lambda = 30,
@@ -19,11 +20,21 @@ omd(
 )
 }
 \arguments{
-\item{M1}{One matrix containing pixel values (m x m).}
+\item{M1}{One matrix containing pixel values (m x n). The row names and
+column names of this matrix are assumed to contain longitude and latitude
+information. Otherwise, lon/lat values of \code{1:m} and \code{1:n} are
+sassumed.}
 
-\item{M2}{Another matrix.}
+\item{M2}{Another matrix; see \code{M1}.}
 
-\item{costm}{Cost matrix \code{m^2 x m^2}.}
+\item{costm}{Cost matrix \code{mm x mn}. If not provided, one is calculated
+as Euclidean distance.}
+
+\item{M1_long}{Long matrix, with a column called "val".}
+
+\item{M2_long}{Another long matrix, with a column called "val"}
+
+\item{coordnames}{Defaults to \code{c("lon", "lat")}.}
 
 \item{type}{Defaults to "transport".}
 }

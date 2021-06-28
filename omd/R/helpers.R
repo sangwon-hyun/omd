@@ -262,13 +262,17 @@ ma.matrix <- function (X, av = "median", delta = 2, edgeNA = FALSE)
     else {
         average <- median
     }
+
+    delta1 = floor(delta)
+    delta2 = ceiling(delta)
+
     #### SLIDING WINDOW
     for (j in 1:dim(X)[[1]]) {
         for (k in 1:dim(X)[[2]]) {
-            a <- (j - delta)
-            c <- (j + delta)
-            b <- (k - delta)
-            d <- (k + delta)
+            a <- (j - delta1)
+            c <- (j + delta1)
+            b <- (k - delta2)
+            d <- (k + delta2)
             if (a < 1) {
                 a <- 1
                 c <- 2 * delta + 1
@@ -362,11 +366,11 @@ drawmat_3d <- function(M, zfac = 30){
 
 
 ##' Helper to add dimension names to matrix \code{M}.
-##' @param M Matrix.
+##' @param M Matrix that contains image.
 ##' @export
 add_dimnames <- function(M){
   colnames(M) = sapply(1:ncol(M), toString)
-  rownames(M) = sapply(1:nrow(M), toString)
+  rownames(M) = sapply(nrow(M):1, toString)
   return(M)
 }
 
@@ -387,6 +391,17 @@ add_global <- function(M, sig, offset=0){
   M_add = matrix(-sig, nrow=n, ncol=n)
   M_add[seq(n/2 + 1 + offset, n),] = sig
   return(M + M_add)
+}
+
+##' Helper to add local pattern.
+##' @export
+add_local <- function(M, shift=0, sig = 1){
+
+  n = ncol(M)
+  M_shifted = M
+  ii = n/2
+  M_shifted[(ii - n/8):(ii + n/8) + shift, (ii - n/8):(ii + n/8)] = M_shifted[(ii - n/8):(ii + n/8) + shift, (ii - n/8):(ii + n/8)] + sig
+  return(M_shifted)
 }
 
 ##' Takes in a (2^k x 2^k) matrix, and adds a checkerboard pattern whose squares
@@ -501,3 +516,58 @@ get_time_space_box <- function(dat, mo, latrange, lonrange, fill_na = FALSE){
 }
 
 
+
+
+
+
+##' Scales \code{x} into between 0 and 1.
+range01 <- function(x, ...){(x - min(x, ...)) / (max(x, ...) - min(x, ...))}
+
+
+##' Scales \code{x} into between \code{min} and \code{max}.
+range_custom <- function(x, min, max){
+  stopifnot(min <= x & x <= max)
+  (x - min) / (max - min)
+}
+
+
+##' From a numeric vector between 0 and 1, make Red-Yellow-Blue colors.
+colfun <- function(vec){
+  colfun_val <- colorRamp(RColorBrewer::brewer.pal(11,"RdYlBu"))
+  colfun_val(vec) %>% apply(1, function(r.g.b)rgb(r.g.b[1], r.g.b[2], r.g.b[3], max = 255))
+}
+
+
+## ##' Checks crossing
+## check_crossing <- function(lat1, lat2, lon1, lon2){
+
+##   ## Two coordinates
+##   coord1 = c(lon1, lat1)
+##   coord2 = c(lon2, lat2)
+
+##   ## Find all coordinates to check.
+##   get_all_land_coordinates <- funciton(){
+##   }
+
+##   lat, lon
+
+## }
+
+
+##' Combine two dataframes
+combine <- function(d1, d2, name1="from", name2="to"){
+
+  ## Setup
+  cols = c(name1, name2)
+
+  ## Merge (to retain only the shared lat-lons) then row-bind.
+  twodat = merge(d1, d2, by = c("lat", "lon"),
+                 suffixes = c(".from", ".to")) %>% as_tibble() %>%
+    dplyr::rename(!!(name1) := val.from,
+           !!(name2) := val.to) %>%
+    tidyr::pivot_longer(cols = cols, names_to = "dat_type", values_to = "val") %>%
+    dplyr::select(lat, lon, dat_type, val) %>%
+    mutate(dat_type = factor(dat_type, levels = c(name1, name2)))
+
+  return(twodat)
+}

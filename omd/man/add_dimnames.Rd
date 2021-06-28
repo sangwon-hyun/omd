@@ -7,7 +7,7 @@
 add_dimnames(M)
 }
 \arguments{
-\item{M}{Matrix.}
+\item{M}{Matrix that contains image.}
 }
 \description{
 Helper to add dimension names to matrix \code{M}.

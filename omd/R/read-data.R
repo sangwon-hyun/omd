@@ -89,20 +89,20 @@ process_data <- function(dat, month, lonrange, latrange){
 make_mat <- function(dat){
   ## dat = mydat[which(lonrange[1] < mydat[,"lon"] & mydat[, "lon"] < lonrange[2] &
   ##                    latrange[1] < mydat[,"lat"] & mydat[, "lat"] < latrange[2]),]
-  lat.ordered = sort(unique(dat[,"lat"]), decreasing=TRUE)
-  lon.ordered = sort(unique(dat[,"lon"]))
+  lat.ordered = sort(unique(dat[,"lat", drop=TRUE]), decreasing=TRUE)
+  lon.ordered = sort(unique(dat[,"lon", drop=TRUE]))
 
-  x = sapply(dat[,"lon"], function(lon) which(lon == lon.ordered))
-  y = sapply(dat[,"lat"], function(lat) which(lat == lat.ordered))
+  x = sapply(dat[,"lon", drop=TRUE], function(lon) which(lon == lon.ordered))
+  y = sapply(dat[,"lat", drop=TRUE], function(lat) which(lat == lat.ordered))
 
   xy = cbind(x,y)
 
-  nlon = length(unique(dat[,"lon"]))
-  nlat = length(unique(dat[,"lat"]))
+  nlon = length(unique(dat[,"lon", drop=TRUE]))
+  nlat = length(unique(dat[,"lat", drop=TRUE]))
 
   mat = matrix(NA, ncol=nlon, nrow=nlat)
   for(ii in 1:nrow(xy)){
-    mat[xy[ii,2], xy[ii,1]] = dat[ii, "Chl"]
+    mat[xy[ii,2], xy[ii,1]] = dat[ii, "Chl", drop=TRUE]
   }
   rownames(mat) = lat.ordered
   colnames(mat) = lon.ordered

@@ -9,7 +9,7 @@ image_to_long_format(img)
 }
 \arguments{
 \item{img}{matrix of pixel values; the row names and col names are assumed
-to contain lat and lon points.}
+to contain latitude and longitude points.}
 }
 \value{
 Matrix with three columns, named `lat`, `lon`, and `val`.

@@ -4,7 +4,7 @@
 \alias{drawmat_precise}
 \title{Taken from Justin's convenience functions..}
 \usage{
-drawmat_precise(mat, contour = FALSE, ...)
+drawmat_precise(mat, contour = FALSE, colfun = NULL, num_color_ramp = 100, ...)
 }
 \description{
 Taken from Justin's convenience functions..
