@@ -73,7 +73,9 @@ omd <- function(M1 = NULL,
   M2_long$val = M2_long$val / sum(M2_long$val)
 
   ## Make cost matrix
-  if(is.null(costm)) costm = form_cost_matrix(M1_long)
+  if(is.null(costm)){
+    costm = form_cost_matrix(M1_long)
+  }
 
   if(type == "sinkhorn"){
 
@@ -124,11 +126,15 @@ omd <- function(M1 = NULL,
 ##' @return p x p cost matrix.
 ##'
 ##' @export
-form_cost_matrix <- function(dat){
+form_cost_matrix <- function(dat, geodesic = FALSE){
   ## dat = image_to_long_format(img1)
   stopifnot("lat" %in% colnames(dat))
   stopifnot("lon" %in% colnames(dat))
-  return(dat %>% dplyr::select(lat, lon) %>% dist() %>% as.matrix())
+  if(!geodesic){
+    return(dat %>% dplyr::select(lat, lon) %>% dist() %>% as.matrix())
+  } else {
+    return(dat %>% dplyr::select(lat, lon) %>% dist() %>% as.matrix())
+  }
 }
 
 ##' Converts a matrix with `n` rows and with columns `lat`, `lon`, into a cost
