@@ -1,0 +1,93 @@
+---
+title: Importing data
+date: "Compiled at `r format(Sys.time(), '%Y-%m-%d %H:%M:%S', tz = 'UTC')` UTC"
+output: 
+  html_document:
+    code_folding: hide
+    toc: true
+    toc_float: true
+  github_document: default
+---
+
+```{r global_options, include=TRUE}
+knitr::opts_chunk$set(fig.width=14, fig.height=8, echo=TRUE, eval=TRUE, cache=FALSE,
+                      warning=FALSE, message=FALSE,
+                      cache.lazy = FALSE)
+
+## ## Setup the cache and file directory
+## origCache <- knitr::opts_chunk$get("cache.path")
+## base <- sub("_cache/.*$", "", origCache)
+## knitr::opts_chunk$set(fig.path = file.path(getwd(), "data", base, 'figures/'))
+
+## Load packages
+library(tidyverse)
+library(knitr)
+library(here)
+
+## Setup some plotting details
+coul <- colorRampPalette(RColorBrewer::brewer.pal(8, "RdYlBu"))(25)
+source("helpers.R")
+```
+ 
+```{r directories}
+## ## Common project name
+## outputdir = file.path("data", base)
+## if(!dir.exists(outputdir)) dir.create(outputdir)
+
+
+base = "00-covariates"
+here::i_am("00-covariates.Rmd")
+knitr::opts_chunk$set(fig.path = here::here("data", base, 'figures/'))
+outputdir = here::here("data", base)
+if(!dir.exists(outputdir)) dir.create(outputdir)
+```
+
+
+There are three datasets for this project.
+
+* Climatology data, from !()[], placed here:
+
+* Non-climatology data, from ~()[], placed here:
+
+* Depth data, downloaded from CMAP, placed here:
+
+
+# Climatology data
+
+The **climatology** chlorophyll dataset is a monthly dataset having averaged 20
+years worth of data for each month (Jan-Dec).
+
+There are multiple resolutions of this data; we mainly make use of the 2-degree resolution data.
+
+```{r climatology}
+## Read in data
+datadir = "/home/sangwonh/Dropbox/research/usc/ocean-provinces/omd/data"
+filenames = c("tabulated_darwin_montly_clim_045_090_ver_0_2_6.csv",
+              "tabulated_darwin_montly_clim_090_180_ver_0_2_6.csv",
+              "tabulated_darwin_montly_clim_180_360_ver_0_2_6.csv",
+              "tabulated_darwin_montly_clim_360_720_ver_0_2_6.csv",
+
+              "tabulated_geospatial_montly_clim_045_090_ver_0_2_5.csv",
+              "tabulated_geospatial_montly_clim_090_180_ver_0_2_5.csv",
+              "tabulated_geospatial_montly_clim_180_360_ver_0_2.csv", ## The 2.5 version is missing.
+              "tabulated_geospatial_montly_clim_360_720_ver_0_2_5.csv")
+ddat = read.csv(file.path(datadir, filenames[2])) %>% as_tibble()
+rdat = read.csv(file.path(datadir, filenames[2+4])) %>% as_tibble()
+```
+
+# Non-climatology data
+
+Non-climatology dataset was compiled by Bror Johnsson and shared as netcdf
+files.
+
+```{r nonclimatology}
+print('Hi world')
+```
+
+# Depth data
+
+The depth dataset has been downloaded from Simon's CMAP, from the tables "" and
+"". Here is the code to do compile this data.
+
+```{r}
+```
