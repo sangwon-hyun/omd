@@ -1,0 +1,196 @@
+---
+title: "Data experiments (Continue from Jan 20th 2021)"
+author: "Sangwon Hyun, Jacob Bien, and the Ocean Provinces working group"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(fig.width = 7, fig.height = 7, echo = TRUE, warning = FALSE,
+                      message = FALSE, eval = TRUE, cache = FALSE)
+## knitr::opts_chunk$set(cache.path = "rmd-cache/feb2-2021-experiments-simplified/")
+```
+
+# Read in libraries
+
+```{r}
+## Read in libraries
+library(latticeExtra)  
+library(Matrix) 
+library(transport)
+library(dplyr)
+library(omd)
+library(raster) 
+library(grid)
+library(gridExtra)
+
+## destin = "~/Dropbox/research/usc/ocean-provinces/omd/" ##
+## la("omd") ## Import from destin
+```
+
+# Summary \& What's new?
+
+- Finished synthetic experiments on the checkerboard pattern example.
+- Visualize the transports.
+- Change the global pattern to also shift a bit.
+
+
+# Two images to be compared
+
+This is what non-overlapping smoothing does to the two mean matrices:
+
+```{r, fig.width=16, fig.height=4}
+n = 2^5 
+M_mean = matrix(0, ncol = n, nrow=n)
+sig = 1 
+M1_mean = M_mean %>% add_global(2) %>% add_checkerboard(4, sig)  %>% add_checkerboard(8, sig) 
+M2_mean = M_mean %>% add_global(2)
+M1_mean = M1_mean + 5 
+M2_mean = M2_mean + 5
+
+## No smoothing, to highly smoothed means
+for(d in c(2:16)){
+  title = paste0("Smoothing window size = ", d, "x", d)
+  gridExtra::grid.arrange(M1_mean %>% smoothmat(d) %>% drawmat_precise(main = "Image 1\n(sliding window avg.)"),
+                          M2_mean %>% smoothmat(d) %>% drawmat_precise(main = "Image 2\n(sliding window avg.)"),
+                          M1_mean %>% binmat(d) %>% drawmat_precise(main = "Image 1\n(nonoverlapping avg.)"),
+                          M2_mean %>% binmat(d) %>% drawmat_precise(main = "Image 2\n(nonoverlapping avg.)"),
+                          ncol = 4,
+                          top=textGrob(title, gp=gpar(fontsize=20,font=2)))
+} 
+```
+
+Now, visualizing two different distances, over a signal size (`sig`, which
+governs how prominent the checkerboard pattern is):
+
+1. (LEFT panel of each row) The difference in the two mean matrices (no noise),
+   generated as:
+     + Take mean matrix 1 and 2.
+     + Coarsen both by a window size of (d x d).
+     + Measure the average of absolute pixel-wise difference.
+
+2. (Right panel of each row) The OMD of the mean matrices.
+     + Take mean matrix 1 and 2.
+     + Coarsen both by a window size of (d x d).
+     + Calculate OMD between the two.
+
+```{r, fig.width=12, fig.height=4}
+## Setup: four different local pattern strengths.
+sigs = c(0, 0.1, 0.5, 1, 2)
+
+
+for(sig in sigs){
+
+
+  ## Setup 3-column plots
+  par(mfrow = c(1, 3), oma = c(1,1,3,1))
+
+  ## Generate mean
+  M1_mean = M_mean %>% add_global(2) %>% add_checkerboard(4, sig)  %>% add_checkerboard(8, sig) 
+  M2_mean = M_mean %>% add_global(2)
+  M1_mean = M1_mean + 5
+  M2_mean = M2_mean + 5
+
+  ## Window sizes
+  sizes = seq(from = 1, to = 16, by = 1)
+
+  ## 1. Calculate PIXELWISE difference in the means
+  diff_in_means = sapply(sizes, function(d){
+    pixelwise_diff <- smoothmat(M1_mean, d) - smoothmat(M2_mean, d)
+    mean(pixelwise_diff^2)
+  })
+
+  ## Plot them
+  cbind(sizes, diff_in_means) %>% ## .[1:15,] %>% 
+    plot(type = 'o', xlab = "Window size",
+         ylab = "L2 pixel-wise dist.")
+  legend("topright", bty="n", legend="Pixel-wise L2 dist.")
+  abline(v = c(4, 8), lty = 2)
+
+  ## 2. Calculate OMD between the means
+  omd_in_means = sapply(sizes, function(d){
+    omd(smoothmat(M1_mean, d), smoothmat(M2_mean, d),
+        type = "transport")$dist
+  })
+
+  
+  ## Plot them
+  cbind(sizes, omd_in_means) %>% ## .[1:15,] %>%  
+    plot(type = 'o', xlab = "Window size",
+         ylab = "OMD")
+  abline(v = c(4, 8), lty = 2)
+  legend("topright", bty="n", legend="OMD\n(Sliding window avg.)")
+
+  ## 3. (NONOVERLAPPING SMOOTHING) Calculate OMD between the means
+  omd_in_means = sapply(sizes, function(d){
+    omd(binmat(M1_mean, d), binmat(M2_mean, d),
+        type = "transport")$dist
+  })
+
+  ## Plot them
+  cbind(sizes, omd_in_means) %>% ## .[1:15,] %>%  
+    plot(type = 'o', xlab = "Window size",
+         ylab = "OMD")
+  abline(v = c(4, 8), lty = 2)
+  legend("topright", bty="n", legend="OMD\n(Nonoverlapping window avg.)")
+
+  ## Add outer text
+  mtext(text = paste0("Size of local pattern = ", sig), cex = 1.5, outer=TRUE, side=3)
+}
+
+```
+
+Why the strong patterns? When the nonoverlapping smoothing windows (and their
+sizes) coincides with the checkerboard pattern (size 4 and 8), OMD is high
+because the local patterns are maximally preserved.
+
+```{r, fig.width = 15, fig.height = 6}
+M1_mean = M_mean %>% add_global(2) %>% add_checkerboard(4, sig)  %>% add_checkerboard(8, sig) 
+M2_mean = M_mean %>% add_global(2)
+M1_mean = M1_mean + 5
+M2_mean = M2_mean + 5
+
+for(window in c(6,7,8,9,10)){
+  obj = omd(M1_mean %>% binmat(window),
+            M2_mean %>% binmat(window))
+  par(oma = c(1,1,5,1))
+  plot_omd(obj, lwd_max = 3, cex_dat = 2.5)
+  mtext(text=paste0("Window size ", window), side=3, outer=TRUE, font=2)
+}
+```
+
+# Shifted (global) pattern
+
+Mass shift pattern is interesting.
+
+```{r, eval=FALSE}
+## Generate mean
+n = 2^4
+M_mean = matrix(0, ncol = n, nrow=n)
+sigs = seq(from = 0, to = 5, by = 1)
+l2 <- function(M1, M2){mean((M1 - M2)^2)}
+omds = l2s = c()
+omd_objs = list()
+for(ii in 1:length(sigs)){
+  sig = sigs[ii]
+  M1_mean = M_mean %>% add_global(1)
+  M2_mean = M_mean %>% add_global(1, offset=sig)
+  M1_mean = M1_mean + 5
+  M2_mean = M2_mean + 5
+  costm = M1_mean %>% add_dimnames() %>% image_to_long_format() %>% form_cost_matrix(pow=2)
+  obj = omd(M1_mean, M2_mean, costm=costm)
+  omd_objs[[ii]] = obj
+  omds[ii] = obj$dist
+  l2s[ii] = l2(M1_mean, M2_mean)## %>% sqrt()
+}
+for(ii in 1:4){
+  omd_objs[[ii]] %>% plot_omd(cex_dat = 5)
+}
+```
+
+
+<div class="tocify-extend-page" data-unique="tocify-extend-page" style="height: 0;"></div>
+

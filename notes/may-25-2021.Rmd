@@ -1,0 +1,52 @@
+
+
+Preparing some figures
+
+Darwin data can be found here: https://simonscmap.com/catalog/datasets/Darwin_Ecosystem
+
+```{r}
+library('cmap4r')
+set_authorization(cmap_key = "5e05c500-d68d-11e9-9d3b-4f83fcec4710")
+dat = get_spacetime(tableName = "tblCHL_REP",
+                    varName = 'chl',
+                    dt1='2014-03-01',
+                    dt2='2014-05-2',
+                    lat1=20,
+                    lat2=50,
+                    lon1=-170,
+                    lon2=-150,
+                    depth1=0,
+                    depth2=100) ##%>% head(10) %>% kable()
+
+dat_darwin = get_spacetime(tableName = "tblDarwin_Ecosystem",
+                           varName = 'CHL',
+                           dt1 = '2014-03-01',
+                           dt2 = '2014-05-2',
+                           lat1 = 20,
+                           lat2 = 50,
+                           lon1 = -170,
+                           lon2 = -150,
+                           depth1 = 0,
+                           depth2 = 100) ##%>% head(10) %>% kable()
+
+dat$time %>%  unique()
+dat_darwin$time %>% unique() 
+
+c(dat$lat %>%  unique(), dat_darwin$lat %>% unique() )
+
+par(mfrow=c(1,2))
+dat_darwin$lat %>% unique()  %>% plot()
+dat$lat %>% unique()  %>% points(col='red')
+
+dat_darwin$lat %>% unique()  %>% head(10)
+dat$lat %>% unique()  %>% head(10)
+
+cut = 0.3##0.8130424448
+dat = dat %>% mutate(chl = pmin(chl, cut))
+```
+
+Okay, so this data doesn't exist on the same gridpoints, so it's kind of hard to do a comparison.
+
+I could bin the data into a slightly coarser resolution.
+
+I think I would probably ask Bror to do this for me though..

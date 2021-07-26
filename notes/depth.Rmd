@@ -35,30 +35,30 @@ dir.create(outputdir, recursive = TRUE)
 ## Colocalize the data
 initialize_cmap(cmap_key = "5e05c500-d68d-11e9-9d3b-4f83fcec4710")
 df = get_metadata('tblHOT_Bottle', 'HPLC_chl3_bottle_hot')
-## dat = compile(sourceTable='tblHOT_Bottle',
-##               sourceVar='HPLC_chla_bottle_hot',
-##               targetTables="tblDarwin_Ecosystem",
-##               targetVars="CHL",
-##               dt1="2013-03-03",
-##               dt2="2015-04-03",
-##               ## lat1=21.847,
-##               ## lat2=22.75,
-##               ## lon1=-158.363,
-##               ## lon2=-157.9,
-##               lat1 = df$Lat_Min,
-##               lat2 = df$Lat_Max,
-##               lon1 = df$Lon_Min,
-##               lon2 = df$Lon_Max,
-##               ## depth1=0.3,
-##               ## depth2=4813.8,
-##               depth1 = df$Depth_Min,
-##               depth2 = df$Depth_Max,
-##               temporalTolerance=c(3),
-##               latTolerance=c(1),
-##               lonTolerance=c(1),
-##               depthTolerance=c(5))
-## saveRDS(dat, file= file.path(outputdir, "dat.RDS"))
-dat = readRDS(file= file.path(outputdir, "dat.RDS"))
+dat = compile(sourceTable='tblHOT_Bottle',
+              sourceVar='HPLC_chla_bottle_hot',
+              targetTables="tblDarwin_Ecosystem",
+              targetVars="CHL",
+              dt1="2013-03-03",
+              dt2="2015-04-03",
+              ## lat1=21.847,
+              ## lat2=22.75,
+              ## lon1=-158.363,
+              ## lon2=-157.9,
+              lat1 = df$Lat_Min,
+              lat2 = df$Lat_Max,
+              lon1 = df$Lon_Min,
+              lon2 = df$Lon_Max,
+              ## depth1=0.3,
+              ## depth2=4813.8,
+              depth1 = df$Depth_Min,
+              depth2 = df$Depth_Max,
+              temporalTolerance=c(3),
+              latTolerance=c(1),
+              lonTolerance=c(1),
+              depthTolerance=c(20))
+saveRDS(dat, file= file.path(outputdir, "dat-higher-depth-tol.RDS"))
+dat = readRDS(file= file.path(outputdir, "dat-higher-depth-tol.RDS"))
 
 ## See a summary of this data.
 dat %>% summary() %>% print()
@@ -78,32 +78,43 @@ for(ii in 1:88){
   onedat = onedat %>% arrange(depth)
 
   if(nrow(onedat) == 0) next
-  ## Make three plots
-  ## png(file = file.path(outputdir, paste0("depthplot-", ii, ".png")),
-  ##                      width = 1200, height = 500)
-  par(mfrow=c(1,3), cex=1.2, oma = c(1,1,4,1))
+
+  ## Make two plots
+  png(file = file.path(outputdir, "overlaid", paste0("depthplot-", ii, ".png")),
+                       width = 800, height = 500)
+  par(mfrow=c(1,2), cex=1.2, oma = c(1,1,4,1))
+
+  ## First plot is Darwin data
   if(any(!is.na(onedat$CHL))){
-    plot(y = onedat$CHL, x = onedat$depth,
-         type='p', cex = 1.5, log="x", pch = 16, xlab = "Depth", ylab = "Darwin CHL", col='grey50')
+    y = onedat$CHL
+    y = y/max(y, na.rm=TRUE)
+    x = onedat$depth
+    plot(y = y, x = x,
+         type='o', cex = 1.5, log="x",  xlab = "Depth", ylab = "Darwin CHL", col='grey50', lwd=3, pch=16)
     mtext(onetime, side = 3, outer=TRUE, cex=2)
   } else {
     plot(NA, ylim=c(0,1))
   }
-  title(main="Darwin Chl-A   vs   depth")
+  title(main = "Darwin Chl-A (black) and real data  vs   depth")
+
+  ## Add real data to first plot
   if(any(!is.na(onedat$HPLC_chla_bottle_hot))){
-    plot(y = onedat$HPLC_chla_bottle_hot,
-         x = onedat$depth,
-         type='p', cex=1.5, pch=16, log='x', xlab = "Depth", ylab = "HOT CHLA", col='grey50')
-    title(main="HOT Chl-A   vs   depth")
-    plot(y=onedat$CHL, x=onedat$HPLC_chla_bottle_hot, pch=16, ylab = "Darwin CHL", xlab = "HOT CHLA", col='grey50', cex=1.5)
+
+    ## Add an overlaid line
+    y = onedat$HPLC_chla_bottle_hot
+    y = y / max(y, na.rm=TRUE)
+    x = onedat$HPLC_chla_bottle_hot
+    lines(y=y, x=x, col = 'red', lwd=3, pch=16, type='o')
+
+    ## Also add scatterplot
+    plot(y=onedat$CHL, x=onedat$HPLC_chla_bottle_hot, pch=16, ylab = "Darwin CHL", xlab = "HOT CHLA", col='grey50', cex=1.5,
+          type='p')
     title(main="Scatterplot between two sources")
   } else {
     plot(NA, ylim=c(0,1))
-    title(main="HOT Chl-A   vs   depth")
-    plot(NA, ylim=c(0,1))
     title(main="Scatterplot between two sources")
   }
-  ## graphics.off()
+  graphics.off()
 }
 ```
 

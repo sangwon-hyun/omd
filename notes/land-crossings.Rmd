@@ -1,0 +1,300 @@
+---
+title: "Handling land crossings"
+author: "Sangwon Hyun, Jacob Bien, and the Ocean Provinces working group"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+## Knitr setup
+knitr::opts_chunk$set(fig.width = 7, fig.height=7, echo=TRUE, warning=FALSE,
+                      message=FALSE, eval=TRUE, cache=TRUE,
+                      dev=c('png', 'pdf', 'svg'))
+
+## Cache setup
+origCache <- knitr::opts_chunk$get("cache.path")
+base <- sub("_cache/.*$", "", origCache)
+knitr::opts_chunk$set(cache.path = file.path(getwd(), 'cache', paste0(base, "/")),
+                      fig.path = file.path(getwd(), 'figures', paste0(base, "/")))
+
+## Load packages
+library(dplyr)
+library(omd)
+library(rworldmap)
+library(maps)
+library(data.table)
+library(grid)
+library(gridExtra)
+library(wesanderson) ##names(wes_palettes)
+library(ggplot2)
+library(gganimate)
+library(gifski)
+range01 <- function(x, ...){(x - min(x, ...)) / (max(x, ...) - min(x, ...))}
+
+## List the climatology data files 
+datadir = "~/Dropbox/research/usc/ocean-provinces/omd/data"
+filenames = c("tabulated_darwin_montly_clim_045_090_ver_0_2.csv",
+              "tabulated_darwin_montly_clim_090_180_ver_0_2.csv",
+              "tabulated_darwin_montly_clim_180_360_ver_0_2.csv",
+              "tabulated_darwin_montly_clim_360_72  0_ver_0_2.csv",
+              "tabulated_geospatial_montly_clim_045_090_ver_0_2.csv",
+              "tabulated_geospatial_montly_clim_090_180_ver_0_2.csv",
+              "tabulated_geospatial_montly_clim_180_360_ver_0_2.csv",
+              "tabulated_geospatial_montly_clim_360_720_ver_0_2.csv")
+
+## Yellow box
+lat = 19.8968
+lon = -155.5828
+boxsize = 30 ## 30
+lonrange = lon + c(-1,1) * boxsize
+latrange = lat + c(-1,1) * boxsize
+
+## Gather data
+darwin_dat = fread(file.path(datadir, filenames[2]), select=c("lat", "lon", "month", "Chl"))
+real_dat = fread(file.path(datadir, filenames[2+4]), select=c("lat", "lon", "month", "Chl"))
+```
+
+
+# Land crossings
+
+
+Helper functions:
+
+```{r helper-functions}
+all_points_between <- function(x0, x1, y0, y1, len = 10){
+  all.x = seq(from = x0, to = x1, length=len)
+  all.y = seq(from = y0, to = y1, length=len)
+  return(cbind(x=all.x, y=all.y))
+}
+
+
+##' Checks if (x0, y0) and (x1, y1) crosses any land in \code{land_inds}.
+##' @param x0 x0
+##' @param y0 y0
+##' @param x1 x1
+##' @param y1 y1
+##' @param land_inds A data frame whose names are x and y
+##' @examples
+##' \dontrun{
+##' ## Simple test
+##' start = data.frame(x=1,y=4)
+##' end   = data.frame(x=4,y=1)
+##' land_inds = expand.grid(1:(nn/2), 1:(nn/2)) %>% rename(x=Var1, y=Var2)
+##' cross = check_cross_land(start$x, start$y, end$x, end$y, land_inds)
+##' assertthat::assert_that(cross == TRUE)
+##' }
+check_cross_land <- function(x0, y0, x1, y1, land_inds, how_many_points_to_check = 30){
+
+  ## Basic checks
+  assertthat::assert_that(all(colnames(land_inds) == c("x", "y")))
+
+  ## Identify all point centers
+  all_pts = all_points_between(x0, x1, y0, y1, how_many_points_to_check)
+  all_round_pts = all_pts %>% as_tibble() %>%
+    mutate(xround = round(x), yround = round(y)) %>%
+    select(x = xround, y = yround) %>% unique()
+  ## all_ceil_pts = all_pts %>% as_tibble %>% mutate(xceiling = ceiling(x), yceiling=ceiling(y), xfloor = floor(x), yfloor = floor(y)) %>% select(x=xceiling, y=yceiling)
+  ## all_floor_pts = all_pts %>% as_tibble %>% mutate(xfloor = floor(x), yfloor=floor(y)) %>% select(x=xfloor, y=yfloor)
+  ## all_round_pts = bind_rows(all_ceil_pts, all_floor_pts) %>% unique()
+
+  ## return(any(pracma::distmat(all_pts, land_inds) <= 1))
+
+  ## Check if they cross land
+  m1 = land_inds
+  m2 = all_round_pts
+  intersection = intersect(m1, m2) ## inner_join(m1, m2)
+  any_intersection = (nrow(intersection) != 0)
+  return(any_intersection)
+}
+
+```
+
+Example of how we'll identify land crossings:
+
+```{r example, fig.width=5.5, fig.height=6}
+nn = 6
+mat0 = matrix(rnorm(nn^2), nrow = nn, ncol = nn)
+rownames(mat0) = 1:nn
+colnames(mat0) = 1:nn
+mat = mat0
+mat[1:(nn/2), 1:(nn/2)] = NA
+matlong = mat %>% image_to_long_format() %>% as_tibble() %>% filter(!is.na(val))
+base_r_plot(matlong[,"lon", drop=TRUE],
+            matlong[,"lat", drop=TRUE],
+            max(matlong[,"lat", drop=TRUE]),
+            val = matlong[,"val", drop=TRUE] %>% range01(),
+            colfun = function(cols){ cols %>% sapply(., function(col)rgb(0, 0, 0, col))},
+            cex = 10)
+
+start = c(x=1,y=4)
+end   = c(x=4,y=1)
+
+## Plot the points between |start| and |end|
+points(x = start["x"], y = nn - start["y"], cex = 5, pch = 16,  col = 'yellow')
+points(x = end["x"], y = nn - end["y"], cex = 5, pch = 16,  col = 'yellow')
+segments(x0 = start["x"], y0 = nn-start["y"], x1 = end["x"], y1 = nn-end["y"],
+         lwd = 2,  col='red')##x=start$x, y=start.$y)
+all_pts = all_points_between(x0 = start["x"], y0 = nn-start["y"], x1 = end["x"],
+                             y1 = nn-end["y"], 20)
+all_round_pts = all_pts %>% as_tibble %>%
+  mutate(xround = round(x), yround=round(y)) %>% select(x = xround, y = yround)
+points(all_round_pts, col = 'red', pch = 16, cex = 2)
+points(all_pts, col = 'red', pch = 16, cex = 1) 
+```
+
+Form the cost matrix (27 x 27, since there are 27 out of 36 pixels that are
+non-NA) and calculate the OMD on a simulated example next. The first cost matrix
+shown is the one before preventing land-crossing; the next one is after.
+
+```{r example2, fig.width = 5, fig.height=5}
+## Form a 6 x 6 matrix with land on the second (topleft) quadrant.
+nn = 6
+mat0 = matrix(rnorm(nn^6, 10, 2) , nrow = nn, ncol = nn)
+rownames(mat0) = 1:nn
+colnames(mat0) = 1:nn 
+mat = mat0
+mat[2+(1:(nn/2)), 2+(1:(nn/2))] = NA
+land_inds = expand.grid(2+(1:(nn/2)), 2+(1:(nn/2))) %>% rename(x=Var1, y=Var2)
+matlong = mat %>% image_to_long_format() %>% as_tibble() %>% filter(!is.na(val))
+coords = matlong %>% select(lat, lon)
+
+## Form the cost matrix
+crossmat = matrix(NA, nrow = nrow(coords), ncol = nrow(coords))
+for(istart in 1:nrow(coords)){
+  for(iend in 1:nrow(coords)){
+      start = coords[istart,] %>% rename(x=lon, y=lat)
+      end = coords[iend,] %>% rename(x=lon, y=lat)
+      cross = check_cross_land(start$x, start$y, end$x, end$y, land_inds)
+      crossmat[istart, iend] = cross
+  }
+}
+
+## Check that this is symmetric
+costm_orig = costm = matlong %>% form_cost_matrix()
+costm %>% drawmat_precise()
+costm[crossmat] = +Inf##1E10##Inf##1E10##Inf
+costm %>% drawmat_precise()
+stopifnot(isSymmetric(costm))
+
+## Normalize the other matrix
+mat = mat/sum(mat, na.rm=TRUE)
+othermat = (mat + 10* runif(length(mat)))
+othermat = othermat/sum(othermat, na.rm=TRUE)
+```
+
+Now, we compute the optimal transport (with original and modified cost matrices
+`costm_orig` and `costm`) and plot it.
+
+```{r example2-compute-and-plot, fig.width=10, fig.height=3.5}
+## Estimate the OMD
+M1_long = mat %>% image_to_long_format() %>% filter(!is.na(val))
+M2_long = othermat %>% image_to_long_format() %>% filter(!is.na(val))
+for(my_costm in list(costm_orig, costm)){
+  res = omd(M1_long = M1_long,
+            M2_long = M2_long,
+            costm = my_costm,
+            p = 1,
+            type = "transport")
+  inds = res$transport_object[,c("from", "to")]
+  dists = sapply(1:nrow(inds), function(ii){ costm[inds[ii,1], inds[ii,2]]})
+  plot_omd(res, cex=10)
+}
+```
+
+
+
+# Darwin data
+
+Now, let's use real data. Here's what Darwin climatology data looks like over
+time:
+
+```{r darwin-data, fig.width = 15, fig.height=5}
+darwin_dat %>% 
+  group_by(month) %>%
+  ggplot() +
+  facet_wrap(~ month, ncol = 4) +
+  geom_raster(aes(y = lat, x = lon, fill = Chl)) +
+  scale_fill_gradientn(colors = c("lightblue", "grey", "red"), guide="colorbar") +
+  theme_minimal()  
+  ## scale_fill_gradientn(colours = pal) + 
+  ## labs(title = 'Month: {frame_time}') ##, x = 'GDP per capita', y = 'life expectancy') -> p
+```
+
+
+Then, isolate our attention to (40 x 40)-sized square centered around (lat,
+lon) = c(19.9, -155.5).
+
+We'll compare Jan and Feb's Darwin climatology data:
+
+```{r, fig.width=5, fig.height=5}
+## Helper function
+get_mat <- function(df, latrange, lonrange){
+  df %>% filter(lonrange[1] < lon,
+                lon < lonrange[2],
+                latrange[1] < lat,
+                lat < latrange[2]) %>%
+  make_mat()
+}
+
+mo = 1
+lat = 19.8968 + 8
+lon = -155.5828 + 8
+boxsize = 30 ## 30
+lonrange = lon + c(-1,1) * boxsize
+latrange = lat + c(-1,1) * boxsize
+
+darwin_dat = fread(file.path(datadir, filenames[1]), select=c("lat", "lon", "month", "Chl"))
+
+mats = darwin_dat %>% 
+  group_by(month) %>%
+  group_split() %>%
+  lapply(., get_mat, latrange = latrange, lonrange = lonrange)
+inds = mats %>% lapply(., function(mat) mat %>% is.na() %>% which(.==1, arr.ind = TRUE))
+stopifnot(do.call(all.equal, inds))
+land_ind = inds[[1]]
+
+darwin_dat_box = darwin_dat %>%  group_by(month) %>%
+  group_split() %>% lapply(., get_mat, latrange=latrange, lonrange=lonrange) 
+
+darwin_dat_box %>% .[[1]] %>% drawmat_precise(main = "Jan")
+darwin_dat_box %>% .[[2]] %>% drawmat_precise(main = "Feb")
+```
+
+Now, let's (coarsen and) apply OMD.
+
+```{r, eval=FALSE}
+## M1_orig = M1 = darwin_dat_box %>% .[[1]] 
+## M1_na = which(is.na(M1), arr.ind=TRUE)
+## ## M1 = M1 %>% smoothmat(10)
+## M1[M1_na] = NA
+## ## M1 %>% drawmat_precise()
+## assertthat::assert_that(all(which(is.na(M1), arr.ind = TRUE) == M1_na))
+## ## M2 = darwin_dat_box %>% .[[2]] %>% smoothmat(5)
+M1 = darwin_dat %>% get_time_space_box(mo=1, latrange = latrange, lonrange = lonrange)
+M2 = darwin_dat %>% get_time_space_box(mo=1, latrange = latrange, lonrange = lonrange)
+M1_na = which(is.na(M1), arr.ind=TRUE)
+costm = get_costm(M1, M1_na %>% as_tibble() %>% rename(x=row, y=col))
+costm %>% drawmat_precise()
+res = omd(M1_long, M2_long, costm = costm, p = 1)
+plot_omd(res, cex=10)
+```
+
+# Next up
+
+* Make `get_costm()` faster. 
+
+* How to make it handle this gracefully and with minimal user input?
+
+* Make smoothing handle NA values gracefully?
+
+* `transport::transport()` is slow/impossible for large images (with more than
+  40,000 pixels, which is like a 200 x 200 image)
+
+
+
+<!-- https://timogrossenbacher.ch/2016/12/beautiful-thematic-maps-with-ggplot2-only/ -->
+
+<div class="tocify-extend-page" data-unique="tocify-extend-page" style="height: 0;"></div>

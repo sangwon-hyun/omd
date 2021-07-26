@@ -1,0 +1,323 @@
+---
+title: "Earthmovers distance and optimal transport on Chlorophyll (take 2)"
+huthor: "Sangwon Hyun, Jacob Bien"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(fig.width=14,
+                      fig.height=5, echo=TRUE, warning=FALSE, message=FALSE, eval=TRUE, cache=TRUE)
+knitr::opts_chunk$set(cache.path = "rmd-cache/hawaii-3-18-2020/")
+
+## Read in libraries
+library(Matrix) 
+library(transport)
+library(rworldmap)
+library(viridis)
+library(maps)
+library(omd)
+library(lattice)
+```
+
+
+```{r read-data}
+## Read in data
+datadir = "/home/sangwonh/Dropbox/research/usc/ocean-provinces/omd/data"
+filenames = c("tabulated_darwin_montly_clim_045_090_ver_0_2.csv",
+              "tabulated_darwin_montly_clim_090_180_ver_0_2.csv",
+              "tabulated_darwin_montly_clim_180_360_ver_0_2.csv",
+              "tabulated_darwin_montly_clim_360_720_ver_0_2.csv",
+              "tabulated_geospatial_montly_clim_045_090_ver_0_2_5.csv",
+              "tabulated_geospatial_montly_clim_090_180_ver_0_2_5.csv",
+              "tabulated_geospatial_montly_clim_180_360_ver_0_2_5.csv",
+              "tabulated_geospatial_montly_clim_360_720_ver_0_2_5.csv",
+              "tabulated_geospatial_montly_clim_045_090_ver_0_2.csv",
+              "tabulated_geospatial_montly_clim_090_180_ver_0_2.csv",
+              "tabulated_geospatial_montly_clim_180_360_ver_0_2.csv",
+              "tabulated_geospatial_montly_clim_360_720_ver_0_2.csv")
+```
+
+# Data region
+
+We'll focus on the yellow box in the map.
+
+```{r new-box}
+dat = read.csv(file.path(datadir, filenames[1]))
+mydat = dat[which(dat[,"month"]==1),]
+colfun = colorRampPalette(c("blue", "red"))
+
+pdf("../figures/climatology-map.pdf", width = 7, height=6.7)
+par(mar=c(0,0,0,0))
+map("world", fill=TRUE, col="white", bg="white", ylim=c(0, 70), mar=c(0,0,0,0),
+    xlim = c(-180, -90))
+## plot(newmap)##, xlim = c(-20, 59), ylim = c(35, 71), asp = 1)
+centers = sample(mydat$Chl, 5)
+points(mydat[ ,c("lon", "lat")], pch=15, cex=20,
+       col=colfun(20)[as.numeric(cut(mydat$Chl,breaks = 20))])
+points(mydat[ ,c("lon", "lat")], pch=15, cex=5,
+       col=colfun(20)[as.numeric(cut(mydat$Chl,breaks = 20))])
+points(mydat[ ,c("lon", "lat")], pch=15, cex=2.5,
+       col=colfun(20)[as.numeric(cut(mydat$Chl,breaks = 20))])
+map("world", fill=TRUE, col="white", bg="white", ylim=c(-90, 90), mar=c(0,0,0,0), add=TRUE)
+## New box 
+lonrange = c(-180, -135)
+latrange = c(20, 45)
+rect(lonrange[1], latrange[1], lonrange[2], latrange[2],
+     border = c("black"), lwd=5)
+legend("bottomleft", bty = "n", ## fill="blue", bg = "white", 
+       legend = "Chlorophyll-A in January\n\n", cex=2)
+graphics.off()
+```
+
+# Darwin (between adjacent months)
+
+```{r all-pairs-of-months, eval=TRUE}
+all.mats = list()
+all.pmats = list()
+for(ii in 1:12){
+  ## One month's data
+  mydat = dat[which(dat[,"month"]==ii),]
+  one.dat = mydat[which(lonrange[1] < mydat[,"lon"] & mydat[, "lon"] < lonrange[2] &
+                        latrange[1] < mydat[,"lat"] & mydat[, "lat"] < latrange[2]),]
+  one.mat = make_mat(one.dat)
+  one.mat = one.mat/sum(one.mat)
+  all.mats[[ii]] = one.mat
+  all.pmats[[ii]] = pgrid(one.mat)
+}
+```
+
+Now, we obtain all twelve months' Darwin data and visualize optimal transports
+in **adjacent** months (Jan to Feb, Feb to March, and so on). Note, I highlighed
+the top 10% high-mass transfers in red.
+
+```{r all-pairs-of-months-transport, fig.width=20, fig.height=60}
+par(mfrow=c(6,2))
+for(ii in 1:11){
+  pgrid1 = pgrid(all.mats[[ii]])
+  pgrid2 = pgrid(all.mats[[ii+1]])
+  res <- transport(pgrid1, pgrid2, p=2,
+                   method="aha")
+
+
+  ## nbin = 2
+  ## cutoffs = seq(from = min(res$mass), to = max(res$mass), length = nbin+1)
+  cutoffs = quantile(res$mass, probs = c(0.9,1))
+  jj = 1
+  massrange = cutoffs[jj:(jj+1)]
+  cols = rep(rgb(0,0,1,0.2), length(res$mass))
+  cols[which(massrange[1] < res$mass & res$mass < massrange[2])] = rgb(1,0,0,0.7)
+
+  plot(pgrid1, pgrid2, res,
+       ## Style options
+       mass="thickness", acol=cols,
+       ## lwd=0.1,
+       rot=TRUE, length=0.2)
+
+  title(main = paste0( month.abb[ii], " to ", month.abb[ii+1]), cex.main=2)
+}
+```
+
+
+
+# Earth Mover's Distance Matrix
+
+Now, let's form a 24 x 24 distance matrix, which encodes *all* the pairwise
+earth mover's distances between all months in real data and Darwin data.
+
+
+```{r all-dist}
+## DARWIN
+all.pmats.darwin = list()
+dat = read.csv(file.path(datadir, filenames[2]))
+nmonth = 12
+for(ii in 1:nmonth){
+  ## One month's data
+  mydat = dat[which(dat[,"month"]==ii),]
+  one.dat = mydat[which(lonrange[1] <= mydat[,"lon"] & mydat[, "lon"] <= lonrange[2] &
+                        latrange[1] <= mydat[,"lat"] & mydat[, "lat"] <= latrange[2]),]
+  one.mat = make_mat(one.dat)
+  ## one.mat = one.mat[-nrow(one.mat),]
+  one.mat = one.mat/sum(one.mat, na.rm=TRUE)
+  one.mat[which(is.na(one.mat))] = 0
+  all.pmats.darwin[[ii]] = pgrid(one.mat)
+}
+
+## REAL
+dat = read.csv(file.path(datadir, filenames[6])) ## real
+all.pmats.real = list()
+for(ii in 1:nmonth){
+  ## if(ii==1) jj=2 ## replace this...................
+  ## if(ii==12) jj=11
+  ## if(ii %ni% c(1,12)) jj=ii
+
+  ## One month's data
+  mydat = dat[which(dat[,"month"]==ii),]
+  one.dat = mydat[which(lonrange[1] <= mydat[,"lon"] & mydat[, "lon"] <= lonrange[2] &
+                        latrange[1] <= mydat[,"lat"] & mydat[, "lat"] <= latrange[2]),]
+  one.mat = make_mat(one.dat)
+  ## if(ii!=12) one.mat = one.mat[-nrow(one.mat),]
+  one.mat = one.mat/sum(one.mat, na.rm=TRUE)
+  ## one.mat[which(is.na(one.mat))] = 0
+  all.pmats.real[[ii]] = pgrid(one.mat)
+}
+
+all.pmats = c(all.pmats.real, all.pmats.darwin)
+nmonth = 24
+distmat = matrix(NA, nmonth, nmonth)
+## mclapply(1:(nmonth)^2, function(imonth){
+##   ii = imonth %% 12 + 1
+##   jj = imonth - 12 * (ii-1)
+for(ii in 1:nmonth){
+  for(jj in 1:nmonth){
+    if(ii>jj){
+      res <- transport(all.pmats[[ii]], all.pmats[[jj]], p=2, method="aha")
+      dist = wasserstein(all.pmats[[ii]], all.pmats[[jj]], tplan=res)
+      distmat[ii,jj] = dist
+      distmat[jj,ii] = dist
+    }
+  }
+} 
+## }, mc.cores=8)
+
+diag(distmat) = 0 
+```
+
+```{r all-dists-quick-viz, fig.height=10, fig.width=10}
+diag(distmat) = NA
+colnames(distmat) = rownames(distmat) = c(paste0("r", 1:(nmonth/2)),
+                                          paste0("d", 1:(nmonth/2)))
+## image(Matrix(distmat))  
+drawmat_precise(distmat, contour=FALSE, main="All months' EMD from Real & Darwin data",
+                 panel = function(...){
+                   panel.levelplot(...)
+                   lattice::panel.abline(v = 12.5, lwd=3)
+                   lattice::panel.abline(h = 12.5, lwd=3)
+                 })
+## abline(v=13, lwd=5)
+## knitr::kable(as.data.frame(signif(distmat,3)))
+```
+
+We can take a look at certain distances; from left to right in the boxplot.
+
+1. Between Darwin and Real.
+2. Among Darwin data.
+3. Among Real data.
+4. Among Darwin data, adjacent months.
+5. Among Real data, adjacent months.
+
+
+**Compared to the larger white box before** we can see that the distances
+between Darwin data and real data (left-most box) is even more separated from
+the rest of the boxplots.
+
+```{r all-dists-boxplot, fig.height=7, fig.width=15}
+diag(distmat) = 0 
+## Extract certain things
+pairdists = sapply(1:12, function(ii){
+  distmat[ii, ii+12]
+})
+distmat.real = distmat[1:12, 1:12]
+distmat.darwin = distmat[13:24, 13:24]
+
+## Combine them into a list
+dists = list(pair= pairdists,
+             darwin = distmat.darwin[lower.tri(distmat.darwin)],
+             real = distmat.real[lower.tri(distmat.real)],
+             darwin_serial = unlist(diag(distmat.darwin[-1,-ncol(distmat.darwin)])),
+             real_serial = unlist(diag(distmat.real[-1,-ncol(distmat.real)])))
+
+## Clean
+dists = lapply(dists, function(a){
+  if(any(is.na(a))){
+    return(a[-which(is.na(a))])
+  } else {
+    return(a)
+  }
+})
+
+names(dists)=c("darwin-to-real","darwin", "real", "darwin m2m", "real m2m")
+boxplot(dists,
+        col=c(rgb(0,0,1,0.2), rep(rgb(1,0,0,0.2),2), rep(rgb(0,1,0,0.2),2)),
+        main="Distributions of Earth mover's distances", cex.main=2, cex.lab=2)
+```
+
+
+# Clustering and Multidimensional Scaling
+
+From a distance matrix containing all pairwise distances, we can produce more
+interesting analyses and visualizations.
+
+**Hierarchical clustering** from the pairwise distances: at the beginning of the
+process, each element is in a cluster of its own. The clusters are then
+sequentially combined into larger clusters until all elements end up being in
+the same cluster.
+
+
+
+```{r all-dists-viz, fig.width=10, fig.height=6}
+colnames(distmat) = rownames(distmat) = c(paste0("real-", 1:(nmonth/2)),
+                                          paste0("darwin-", 1:(nmonth/2)))
+distmat <- as.dist(distmat, diag = TRUE)
+
+labelCol <- function(x) {
+  if (is.leaf(x)) {
+    ## fetch label
+    label <- attr(x, "label") 
+    ## set label color to red for A and B, to blue otherwise
+    attr(x, "nodePar") <- list(lab.col=ifelse(sapply(label, substr, 1,4) == "real", "blue", "red"))
+  }
+  return(x)
+}
+
+## plot(hclust(distmat), axes=FALSE)
+hc = hclust(distmat)
+d <- dendrapply(as.dendrogram(hc), labelCol)
+plot(d, axes=FALSE)
+```
+
+**Multidimensional scaling (MDS)** is a *dimension reduction* technique to
+translate + visualize the level of similarity of $n$ individual cases of a
+dataset. MDS translates pairwise 'distances' among a set of $n=24$ objects into
+a configuration of $n=24$ points mapped into a lower-dimensional Cartesianspace
+(e.g. 2D) while preserving the pairwise distances.
+
+<!-- Basically, the coordinates of the 2d graph are in the eigenspace spanned by the -->
+<!-- first two eigenvectors of the distance matrix. -->
+
+```{r, fig.width=10, fig.height=10}
+## Multidimensional scaling
+fit <- cmdscale(distmat, eig=TRUE, k=2) # k is the number of dim
+
+# plot solution
+x <- fit$points[,1]
+y <- fit$points[,2]
+par(pty="s")
+plot(x, y, xlab="Coordinate 1", ylab="Coordinate 2",
+     main="Metric MDS", type="n")
+text(x, y, labels = c(paste0(1:(nmonth/2)),
+                      paste0(1:(nmonth/2))),
+     col =  c(rep("blue", nmonth/2), rep("red", nmonth/2)),
+     cex=2)
+legend("topright", fill=c('blue', 'red'), legend = c("real", "Darwin"))
+```
+
+Each data source is closer to each other, more so than the same month from the
+two data sources.
+
+
+
+# Some subtleties
+
+What to do for optimal transport in the presence of land mass to obstruct
+movement (water can't cross a peninsula)? One can simply modify the distances so
+that, the Euclidean distance is the default, but whenever the arrow meets a land
+mass, the distance is positive infinity so that it incurs an infinite cost for
+any mass to cross a landmass. (If it really needs to, it will go around the
+coast.)
+
+Also, the Wasserstein's distance metric does not seem to be comparable between
+different size objects. In other words, 

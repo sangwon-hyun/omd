@@ -1,0 +1,355 @@
+---
+title: "Multiscale comparison (real data)"
+author: "Sangwon Hyun, Jacob Bien, and the Ocean Provinces working group"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(fig.width = 7, fig.height=7, echo=TRUE, warning=FALSE,
+                      message=FALSE, eval=TRUE, cache=FALSE)
+## knitr::opts_chunk$set(cache.path = "rmd-cache/feb2-2021/")
+library(dplyr)
+library(omd)
+library(rworldmap)
+library(maps)
+library(data.table)
+library(grid)
+library(gridExtra)
+
+## List the climatology data files 
+datadir = "~/Dropbox/research/usc/ocean-provinces/omd/data"
+filenames = c("tabulated_darwin_montly_clim_045_090_ver_0_2.csv",
+              "tabulated_darwin_montly_clim_090_180_ver_0_2.csv",
+              "tabulated_darwin_montly_clim_180_360_ver_0_2.csv",
+              "tabulated_darwin_montly_clim_360_72  0_ver_0_2.csv",
+              "tabulated_geospatial_montly_clim_045_090_ver_0_2.csv",
+              "tabulated_geospatial_montly_clim_090_180_ver_0_2.csv",
+              "tabulated_geospatial_montly_clim_180_360_ver_0_2.csv",
+              "tabulated_geospatial_montly_clim_360_720_ver_0_2.csv")
+
+## Yellow box
+lat = 19.8968
+lon = -155.5828
+boxsize = 30 ## 30
+lonrange = lon + c(-1,1) * boxsize
+latrange = lat + c(-1,1) * boxsize
+
+
+## Color function, that takes in a vector of
+colfun2 <- function(vec){
+  colfun_val <- colorRamp(RColorBrewer::brewer.pal(11,"RdYlBu"))
+  colfun_val(vec) %>% apply(1, function(r.g.b)rgb(r.g.b[1], r.g.b[2], r.g.b[3], max = 255))
+}
+colfun <- colorRampPalette(c("blue", "red"))
+
+bin_size = 1
+
+figdir = "mar31-2021-files"
+dir.create(figdir)
+```
+
+
+Read real and Darwin data, once.
+
+```{r}
+darwin_dat = fread(file.path(datadir, filenames[2]), select=c("lat", "lon", "month", "Chl"))
+real_dat = fread(file.path(datadir, filenames[2+4]), select=c("lat", "lon", "month", "Chl"))
+```
+
+Let's visualize the data again.
+
+Darwin data:
+
+```{r eval=TRUE, fig.width=10, fig.height=5}
+plots = lapply(1:2, function(mo){
+  main = paste0(month.abb[mo], ", Darwin")
+  darwin_dat %>% get_time_space_box(mo = mo, latrange, lonrange, fill_na = FALSE) %>% smoothmat(bin_size) %>% drawmat_precise(main = main, colfun = colfun)
+})
+do.call("grid.arrange", c(plots, ncol=2))
+```
+
+Here is the $p$-Wasserstein distance between January and February, for $p=1,2$.
+
+```{r, fig.width=15, fig.height=5}
+dats = lapply(c(1,2), function(mo){
+  darwin_dat %>% get_time_space_box(mo = mo, latrange, lonrange, fill_na = TRUE) %>% smoothmat(bin_size)
+})
+for(p in c(1:2)){
+  obj = omd(dats[[1]], dats[[2]], p = p)
+  par(oma=c(1,1,3,1))
+  obj %>% plot_omd(colfun = colfun2)
+  mtext(text = paste0(p, "-", "Wasserstein distance"), side=3, outer=TRUE, font=2)
+}
+```
+
+The arrow lengths get shorter from $p=1$ to $p=2$ (since it's harder for mass to transport).
+
+```{r}
+la('omd')
+p2_costm = omd(dats[[1]], dats[[2]], p = 2)  %>% .$costm
+## summaries = list()
+arrow_length_list = list()
+for(p in c(1:2)){
+  obj = omd(dats[[1]], dats[[2]], p = p)
+  arrow_lengths = obj %>%
+    .$transport_object %>%
+    select(from, to) %>%
+    as.matrix() %>% 
+    ## rowwise() %>% 
+    apply(., 1, function(one_transport){
+      p2_costm[one_transport[1], one_transport[2]]
+    })
+
+  ## Save arrow lengths.
+  arrow_length_list[[p]] = arrow_lengths[arrow_lengths!=0]
+}
+```
+
+```{r, fig.width = 8, fig.height = 4}
+par(mfrow = c(1, 2))
+for(p in 1:2){
+  hist(arrow_length_list[[p]],
+       xlim = c(0,35), main = paste0("Arrow lengths, p=", p),
+       ylab="Arrow length (Euclidean distance)",
+       xlab = "")
+}
+```
+
+```{r, results='asis'}
+summaries = lapply(arrow_length_list, summary)
+summaries = do.call(cbind, summaries) %>% round(2)
+colnames(summaries) = paste0("p=", 1:2)
+knitr::kable(summaries)
+```
+
+
+```{r}
+knitr::knit_exit()
+```
+
+# Continue here
+
+(Justin will continue here!!)
+
+Let's say we just opted for $p=1$. Then, we can compare the pixel-wise distance
+visually with OMD.
+
+```{r, eval = FALSE}
+obj = omd(dats[[1]], dats[[2]], p = 1)
+```
+
+# What next?
+
+We want a multi-scale comparison with OMD on real data.
+
+```{r, fig.width = 21, fig.height=7}
+la('omd')
+mo = 1
+for(p in c(1, 2)){
+  folder = paste0("p=", p)
+  objlist = list()
+  bin_sizes = seq(from=1, to=28, by=1)
+  maxcol = NULL
+  for(ii in 1:length(bin_sizes)){
+    bin_size = bin_sizes[ii]
+    darwin_jan_dat = darwin_dat %>% get_time_space_box(mo = mo, latrange, lonrange, fill_na = TRUE) %>% smoothmat(bin_size)
+    real_jan_dat = real_dat %>% get_time_space_box(mo = mo, latrange, lonrange, fill_na = TRUE) %>% smoothmat(bin_size)
+    obj = omd(darwin_jan_dat,  real_jan_dat, type = "transport", p = p)
+    if(ii==1) maxcol = max(obj$M1_long[,"val"], obj$M2_long[,"val"])
+    png(file = file.path(figdir, folder, paste0("bin-", bin_size, ".png")), width=21, height=7, units='in', res=300)
+    par(oma=c(1,1,3,1))
+    plot_omd(obj, cex = 10, maxcol = maxcol)
+    mtext(text = paste0("Bin size = ", bin_size), side=3, outer=TRUE, font=2)
+    graphics.off()
+    objlist[[ii]] = obj
+  }
+
+  ## Draw all OMD in a single plot
+  dists = objlist %>% sapply(., `[`, c('dist')) %>% unlist()
+  png(file = file.path(figdir, folder, paste0("all-omd.png")), width=6, height=6, units='in', res=300)
+  plot(y = dists,
+       x = bin_sizes,
+       type = 'o', pch = 16,
+       ylab = paste0("OMD (", p, "-Wasserstein distance)"),
+       xlab = "Bin size for averaging")
+  abline(v = seq(from = 0, to = 30, by = 1), lty = 2, col = rgb(0, 0, 1, 0.2))
+  graphics.off()
+}
+```
+
+(You can also flip through these images in the folder `mar31-2021` under `p=1` and `p=2`)
+
+There seems to be two phases
+1. A flat phase where the OMD seems to be stable. This seems to indicate
+2. After
+
+
+```{r}
+## p = 2
+folder = "by-month"
+for(p in 1:2){
+  folder2 = paste0("p=", p)
+  print(folder2)
+  dir.create(file.path(figdir, folder, folder2))
+  for(mo in 1:12){
+    moname = month.abb[mo]
+    print(moname)
+    objlist = list()
+    bin_sizes = seq(from=1, to=28, by=1)
+    maxcol = NULL
+
+    darwin_mo_dat = darwin_dat %>% get_time_space_box(mo = mo, latrange, lonrange, fill_na = TRUE)
+    real_mo_dat = real_dat %>% get_time_space_box(mo = mo, latrange, lonrange, fill_na = TRUE)
+    ## In case the two don't match
+    rr = real_mo_dat  %>% rownames()
+    rd = darwin_mo_dat  %>% rownames()
+    if(!all(rd %in% rr)){
+      darwin_mo_dat = darwin_mo_dat %>% .[which(rd %in% rr),] 
+    }
+    for(ii in 1:length(bin_sizes)){
+      bin_size = bin_sizes[ii]
+      darwin_one_dat = darwin_mo_dat %>% smoothmat(bin_size)
+      real_one_dat = real_mo_dat %>% smoothmat(bin_size)
+      obj = omd(darwin_one_dat,  real_one_dat, type = "transport", p = p)
+      if(ii==1) maxcol = max(obj$M1_long[,"val"], obj$M2_long[,"val"])
+      dir.create(file.path(figdir, folder, folder2, moname))
+      png(file = file.path(figdir, folder, folder2, moname, paste0(moname, "-bin-", bin_size, ".png")), width=21, height=7, units='in', res=300)
+      par(oma=c(1,1,3,1))
+      plot_omd(obj, cex = 4.3)##, maxcol = maxcol)
+      mtext(text = paste0("Bin size = ", bin_size, ", ", moname), side=3, outer=TRUE, font=2)
+      graphics.off()
+      objlist[[ii]] = obj
+    }
+  
+    ## Draw all OMD in a single plot
+    dists = objlist %>% sapply(., `[`, c('dist')) %>% unlist()
+    png(file = file.path(figdir, folder, folder2, paste0("all-omd-", moname, ".png")),
+        width=6, height=6, units='in', res=300)
+    plot(y = dists,
+         x = bin_sizes,
+         type = 'o', pch = 16,
+         ylab = paste0("OMD (", p, "-Wasserstein distance)"),
+         xlab = "Bin size for averaging")
+    title(main = moname)
+    abline(v = seq(from = 0, to = 30, by = 1), lty = 2, col = rgb(0, 0, 1, 0.2))
+    graphics.off()
+  }
+}
+```
+
+# Conclusions from the binning experiment
+
+There are trends in the OMD over data resolution 
+
++ Generally speaking, OMD decreases to zero as data resolution gets coarser.
+
++ Two other things happen: plateus, and dips.
+  * **Plataeus** are binning window sizes in which the differences between the
+    images are not resolved.
+  * Then, **dips** are when the binning windows between the images are start to
+    make a difference. These are periods where the difference *is being resolved*.
+  * Since dips occur only while the difference is being resolved, these periods
+    (window sizes) are the geographical scales at which differences exist.
+
+
+
+# Simulation example
+
+Has nothing to do with multi-scale data
+
+```{r}
+n = 2^5 
+M_mean = matrix(0, ncol = n, nrow=n)
+sig = 1 
+la('omd')
+shifts = -c(0:11)
+pdiff = c()
+omd = c()
+omdreslist = list()
+for(ii in 1:length(shifts)){
+  shift = shifts[ii]
+  M1_mean = M_mean %>% add_global(2) 
+  M2_mean = M_mean %>% add_global(2) %>% add_local(shift, 2)
+  M1_mean %>% drawmat_precise()
+  M1_mean = M1_mean + 5 
+  M2_mean = M2_mean + 5
+
+
+  ## Pixelwise difference
+  pixelwise_diff <- M1_mean - M2_mean
+  pdiff[ii] = mean(pixelwise_diff^2)
+
+  ## OMD
+  ## 3. (NONOVERLAPPING SMOOTHING) Calculate OMD between the means
+  omdres = omd(M1_mean, M2_mean, type = "transport", p = 1)
+  omd[ii] = omdres$dist
+  omdreslist[[ii]] = omdres
+}
+
+
+png(file = file.path("~/Desktop", paste0("summary.png")), width = 5, height = 5, units="in", res=300)
+plot(omd, type='l', lwd = 3, col='red')
+lines(pdiff, type = 'l', lwd = 3, col='black')
+legend("topleft", col=c("black", "red"), lty=c(1,1), legend=c("pixel-wise", "1-Wass."))
+graphics.off()
+
+## Also make plots of the mass transfers
+for(ii in 1:12){
+  png(file = file.path("~/Desktop", paste0("shift-", ii, ".png")), width = 15, height = 5, units="in", res=300)
+  plot_omd(omdreslist[[ii]])
+  graphics.off()
+}
+```
+
+
+# Intro example
+- *todo:* Come up with a compelling demonstrating example for using OMD.
+  1. Imagine a shift of a patch.
+  2. Pixel-wise difference will .
+  3. But an OMD difference can make a huge change
+  4. Pixel-wise difference is less relevant
+
+
+# Intro example
+
+```{r}
+objlist = list()
+maxcol = NULL
+for(mo in 1:12){
+  print(mo)
+  real_dat1 = real_dat %>% get_time_space_box(mo = mo, latrange, lonrange, fill_na = TRUE) 
+  next_mo = mo + 1
+  if(next_mo == 13) next_mo = 1
+  real_dat2 = real_dat %>% get_time_space_box(mo = next_mo, latrange, lonrange, fill_na = TRUE) 
+  obj = omd(real_dat1, real_dat2)
+  png(file = file.path("~/Desktop", paste0("mo-", mo, "-",  next_mo, ".png")),
+      width=21, height=7, units='in', res=300)
+  plot_omd(obj, cex=4.3)
+  graphics.off()
+}
+```
+
+
+# Geodesic distance
+
+```{r}
+library(geodist)
+mo = 1
+real_dat = fread(file.path(datadir, filenames[2]), select=c("lat", "lon", "month", "Chl"))
+dats = list(real_dat %>% get_time_space_box(mo = 1, latrange, lonrange, fill_na = TRUE),
+            real_dat %>% get_time_space_box(mo = 6, latrange, lonrange, fill_na = TRUE))
+costm = dats[[1]] %>% image_to_long_format() %>% form_geodesic_cost_matrix()
+p = 2
+obj = omd(dats[[1]], dats[[2]], p = p, costm = costm)
+plot_omd(obj)
+obj$costm
+obj
+```
+
+<div class="tocify-extend-page" data-unique="tocify-extend-page" style="height: 0;"></div>
+
+

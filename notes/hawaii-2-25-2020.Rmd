@@ -76,7 +76,7 @@ $$E M D(P, Q)=\frac{\sum_{i=1}^{m} \sum_{j=1}^{n} d_{i j} f_{i j}}{\sum_{i=1}^{m
 (Taken directly from Orlova et
 al. https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0151859)
 
-![Figure: Schematic of EMD (https://sbl.inria.fr/doc/group__Earth__mover__distance-package.html).](/home/shyun/Dropbox/research/usc/ocean-provinces/omd/figures/Earth_mover_distance_logo.png)
+![Figure: Schematic of EMD (https://sbl.inria.fr/doc/group__Earth__mover__distance-package.html).](/home/sangwonh/Dropbox/research/usc/ocean-provinces/omd/figures/Earth_mover_distance_logo.png)
 
 # Data visualization
 
@@ -118,7 +118,7 @@ map("world", fill=TRUE, col="white", bg="white", ylim=c(-90, 90), mar=c(0,0,0,0)
 
 lat = 19.8968
 lon = -155.5828
-boxsize = 30
+boxsize = 50
 lonrange = lon + c(-1,1)*boxsize
 latrange = lat + c(-1,1)*boxsize
 rect(lonrange[1], latrange[1], lonrange[2], latrange[2],

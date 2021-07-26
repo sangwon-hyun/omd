@@ -1,0 +1,190 @@
+---
+title: "Multiscale comparison (real data)"
+author: "Sangwon Hyun, Jacob Bien, and the Ocean Provinces working group"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(fig.width = 7, fig.height=7, echo=TRUE, warning=FALSE,
+                      message=FALSE, eval=TRUE, cache=FALSE)
+## knitr::opts_chunk$set(cache.path = "rmd-cache/feb2-2021/")
+library(dplyr)
+library(omd)
+library(rworldmap)
+library(maps)
+library(data.table)
+library(grid)
+library(gridExtra)
+
+
+## Yellow box
+lat = 19.8968
+lon = -155.5828
+boxsize = 30
+lonrange = lon + c(-1,1)*boxsize
+latrange = lat + c(-1,1)*boxsize
+
+## List the climatology data files 
+datadir = "~/Dropbox/research/usc/ocean-provinces/omd/data"
+filenames = c("tabulated_darwin_montly_clim_045_090_ver_0_2.csv",
+              "tabulated_darwin_montly_clim_090_180_ver_0_2.csv",
+              "tabulated_darwin_montly_clim_180_360_ver_0_2.csv",
+              "tabulated_darwin_montly_clim_360_72  0_ver_0_2.csv",
+              "tabulated_geospatial_montly_clim_045_090_ver_0_2.csv",
+              "tabulated_geospatial_montly_clim_090_180_ver_0_2.csv",
+              "tabulated_geospatial_montly_clim_180_360_ver_0_2.csv",
+              "tabulated_geospatial_montly_clim_360_720_ver_0_2.csv")
+```
+
+# Summary
+
+Applying the multiscale analysis to real data:
+
+# Data from around NPTZ (North Pacific Tranzition Zone)
+
+Here is the region we are interested in.
+
+```{r viz-data}
+## Visualize coarse data
+dat = read.csv(file.path(datadir, filenames[1+4]))
+dat = dat %>% select(lat, lon, month, Chl)
+mydat = dat[which(dat[,"month"]==1),]
+colfun = colorRampPalette(c("blue", "red"))
+## colfun = colorRampPalette(c(rgb(0,0,1,0.1), rgb(1,0,0,0.1)))
+newmap <- getMap()
+map("world", fill=TRUE, col="white", bg="white", ylim=c(-90, 90), mar=c(0,0,0,0))
+
+par(mar=c(0,0,0,0))
+## plot(newmap)##, xlim = c(-20, 59), ylim = c(35, 71), asp = 1)
+centers = sample(mydat$Chl, 5)
+points(mydat[ ,c("lon", "lat")], pch=15, cex=4,
+       col=colfun(20)[as.numeric(cut(mydat$Chl,breaks = 20))])
+map("world", fill=TRUE, col="white", bg="white", ylim=c(-90, 90), mar=c(0,0,0,0), add=TRUE)
+rect(lonrange[1], latrange[1], lonrange[2], latrange[2],
+     border = c("yellow"), lwd=3)
+```
+
+Load and clean data.
+
+```{r}
+
+## Retrieve the finest one (1/2 degree resolution)
+if(FALSE){
+  darwin_dat = read.csv(file.path(datadir, filenames[4]))
+  real_dat = read.csv(file.path(datadir, filenames[4+4]))
+  darwin_dat = darwin_dat %>% select(lat, lon, month, Chl)
+  real_dat = real_dat %>% select(lat, lon, month, Chl)
+  head(real_dat)
+
+  ## ## This might be better
+  darwin_dat = fread(file.path(datadir, filenames[2]), select=c("lat", "lon", "month", "Chl"))
+  real_dat = fread(file.path(datadir, filenames[2+4]), select=c("lat", "lon", "month", "Chl"))
+
+  darwin_dat %>% object.size() %>% format("Mb")
+  real_dat %>% object.size() %>% format("Mb")
+  saveRDS(darwin_dat, file=file.path(datadir, "darwin_chl_finest_resolution.RDS"))
+  saveRDS(real_dat, file=file.path(datadir, "real_chl_finest_resolution.RDS"))
+
+  ## Load it
+  darwin_dat = readRDS(file=file.path(datadir, "darwin_chl_finest_resolution.RDS"))
+  real_dat = readRDS(file=file.path(datadir, "real_chl_finest_resolution.RDS"))
+}
+
+darwin_dat = fread(file.path(datadir, filenames[2]), select=c("lat", "lon", "month", "Chl"))
+real_dat = fread(file.path(datadir, filenames[2+4]), select=c("lat", "lon", "month", "Chl"))
+
+## Focus on yellow box in the North Pacific, and interpolate
+real.jan.mat = real_dat %>% subset(month==1) %>% filter(lonrange[1] < lon,
+                                                        lon < lonrange[2],
+                                                        latrange[1] < lat,
+                                                        lat < latrange[2]) %>%
+  make_mat() %>% fill_in_empty(2)
+darwin.jan.mat = darwin_dat %>% subset(month==1) %>% filter(lonrange[1] < lon,
+                                                            lon < lonrange[2],
+                                                            latrange[1] < lat,
+                                                            lat < latrange[2]) %>%
+  make_mat() %>% fill_in_empty(2)
+```
+
+Now, the January data at 2 degree resolution (no coarsening), from the two data
+sources, look like this.
+
+```{r, fig.width=10, fig.height=5}
+## Plot the two together
+gridExtra::grid.arrange(drawmat_precise(real.jan.mat, main = "Jan real"),
+                        drawmat_precise(darwin.jan.mat, main = "Darwin real"),
+                        ncol=2)
+```
+
+And here is the data after coarsening by non-overlapping bins:
+
+
+```{r, fig.width=10, fig.height=5}
+## Calculate the OMD in this region
+for(bin_size in 1:28){
+  gridExtra::grid.arrange(real.jan.mat %>% smoothmat(bin_size) %>% drawmat_precise( main = "Jan real"),
+                          darwin.jan.mat %>% smoothmat(bin_size) %>% drawmat_precise(main = "Darwin real"),
+                          ncol = 2,
+                          top = textGrob(paste0("Bin size ", bin_size), gp = gpar(fontsize=20, font=2)))
+}
+```
+
+Now, the calculate OMD:
+
+```{r, eval=TRUE}
+objlist = list()
+for(bin_size in 1:28){
+  obj = omd(real.jan.mat %>% smoothmat(bin_size),
+            darwin.jan.mat %>% smoothmat(bin_size))
+  objlist[[bin_size]] = obj
+}
+
+## Also calculate the pixel-wise differences
+l2dists = c()
+l2 <- function(m1, m2){mean((m1-m2)^2)}
+for(bin_size in 1:28){
+  l2dists[bin_size] = l2(real.jan.mat %>% smoothmat(bin_size),
+                         darwin.jan.mat %>% smoothmat(bin_size))
+}
+
+## Also calculate pixel-wise differences as images
+pixel_wise_diffs = list()
+for(bin_size in 1:28){
+  pixel_wise_diffs[[bin_size]] = (real.jan.mat %>% smoothmat(bin_size) -  darwin.jan.mat %>% smoothmat(bin_size))
+}
+```
+
+Then, make the mass transport plots:
+
+```{r, fig.width=13.5, fig.height=4.5}
+## Make the plots
+for(bin_size in 1:28){ plot_omd(objlist[[bin_size]]) }
+```
+
+Also visualize the pixel-wise differences as images:
+
+```{r, fig.width=15, fig.height=100}
+plots = lapply(1:28, function(ii){
+  px = pixel_wise_diffs[[ii]]
+  px %>% drawmat_precise(main=paste0("Bin size ", ii))
+})
+do.call("grid.arrange", c(plots, ncol=3))
+```
+
+Also, visualize the two distances -- OMD and L2 distances -- over resolution:
+
+```{r, fig.width = 8, fig.height = 4}
+omds = sapply(objlist, function(a)a$dist)
+par(mfrow=c(1, 2))
+plot(omds, type='o', lwd=2, main = "OMD", xlab = "Bin size", ylab = "OMD")
+abline(v = seq(from=0, to=28, by=1), col=rgb(0,0,0,0.2), lwd=2, lty=3)
+plot(l2dists, type='o', main="Pixel-wise L2 dist", xlab = "Bin size", lwd=2, lty=3, ylab = "L2 distance")
+abline(v = seq(from=0, to=28, by=1), col=rgb(0,0,0,0.2), lwd=2, lty=3)
+```
+
+
+<div class="tocify-extend-page" data-unique="tocify-extend-page" style="height: 0;"></div>
