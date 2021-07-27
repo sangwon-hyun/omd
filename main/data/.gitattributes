@@ -5,3 +5,5 @@ tabulated_geospatial_montly_clim_360_720_ver_0_2_5.csv filter=lfs diff=lfs merge
 tabulated_darwin_montly_clim_045_090_ver_0_2_6.csv filter=lfs diff=lfs merge=lfs -text
 tabulated_darwin_montly_clim_090_180_ver_0_2_6.csv filter=lfs diff=lfs merge=lfs -text
 tabulated_darwin_montly_clim_180_360_ver_0_2_6.csv filter=lfs diff=lfs merge=lfs -text
+*.nc filter=lfs diff=lfs merge=lfs -text
+*.csv filter=lfs diff=lfs merge=lfs -text

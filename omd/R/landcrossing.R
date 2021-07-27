@@ -204,6 +204,24 @@ complete_rectangle <- function(dat){
   return(dat)
 }
 
+##' Same as \code{complete_rectangle} but doesn't need \code{month} or
+##' \code{dat_type},.
+complete_rectangle_barebones <- function(dat){
+  complete_grid = expand.grid(lat = dat$lat %>% unique(),
+                              lon = dat$lon %>% unique()) %>% as_tibble()
+  incomplete_grid = dat %>% dplyr::select(lat, lon)
+
+  rest_of_grid = dplyr::anti_join(as_tibble(complete_grid), incomplete_grid)
+  if(nrow(rest_of_grid) > 0){
+    rest_of_dat = data.frame(lat = rest_of_grid$lat,
+                             lon = rest_of_grid$lon, val = NA)
+    dat = dat %>% dplyr::bind_rows(rest_of_dat)
+  } else {
+    print("Rectangle was complete already! Nothing was changed.")
+  }
+  return(dat)
+}
+
 
 ##' Make the two data sources share the same lat/lon points; discard the
 ##' non-overlapping ones. Basically erases a-b from a.

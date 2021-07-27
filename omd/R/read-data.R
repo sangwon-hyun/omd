@@ -83,10 +83,12 @@ process_data <- function(dat, month, lonrange, latrange){
 ##' @param dat A matrix that contains Chl, lat and lon; places them on a grid of
 ##'   values based on Chl, lat and lon.
 ##'
+##' @param datname Optionally, provide data name other than "Chl".
+##'
 ##' @return Matrix
 ##'
 ##' @export
-make_mat <- function(dat){
+make_mat <- function(dat, datname = "Chl"){
   ## dat = mydat[which(lonrange[1] < mydat[,"lon"] & mydat[, "lon"] < lonrange[2] &
   ##                    latrange[1] < mydat[,"lat"] & mydat[, "lat"] < latrange[2]),]
   lat.ordered = sort(unique(dat[,"lat", drop=TRUE]), decreasing=TRUE)
@@ -102,7 +104,8 @@ make_mat <- function(dat){
 
   mat = matrix(NA, ncol=nlon, nrow=nlat)
   for(ii in 1:nrow(xy)){
-    mat[xy[ii,2], xy[ii,1]] = dat[ii, "Chl", drop=TRUE]
+    ## mat[xy[ii,2], xy[ii,1]] = dat[ii, "Chl", drop=TRUE]
+    mat[xy[ii,2], xy[ii,1]] = dat[ii, datname, drop=TRUE]
   }
   rownames(mat) = lat.ordered
   colnames(mat) = lon.ordered

@@ -14,75 +14,201 @@ knitr::opts_chunk$set(fig.width=14, fig.height=8, echo=TRUE, eval=TRUE, cache=FA
                       warning=FALSE, message=FALSE,
                       cache.lazy = FALSE)
 
-## ## Setup the cache and file directory
-## origCache <- knitr::opts_chunk$get("cache.path")
-## base <- sub("_cache/.*$", "", origCache)
-## knitr::opts_chunk$set(fig.path = file.path(getwd(), "data", base, 'figures/'))
-
 ## Load packages
 library(tidyverse)
 library(knitr)
 library(here)
-
-## Setup some plotting details
-coul <- colorRampPalette(RColorBrewer::brewer.pal(8, "RdYlBu"))(25)
-source("helpers.R")
+library(ggplot2)
+library(tidync)
+source("00-helpers.R")
+load_all("~/repos/omd/omd") ## Location of OMD R package; replace with library(omd) soon.
 ```
  
 ```{r directories}
-## ## Common project name
-## outputdir = file.path("data", base)
-## if(!dir.exists(outputdir)) dir.create(outputdir)
-
-
-base = "00-covariates"
-here::i_am("00-covariates.Rmd")
+base = "00-import-data"
+here::i_am("00-import-data.Rmd")
 knitr::opts_chunk$set(fig.path = here::here("data", base, 'figures/'))
-outputdir = here::here("data", base)
-if(!dir.exists(outputdir)) dir.create(outputdir)
+datadir = here::here("data", base)
+## outputdir = here::here("data", base)
+if(!dir.exists(datadir)) dir.create(datadir)
 ```
 
+There are three datasets for this project, all placed here
+[](/data/00-import-data).
 
-There are three datasets for this project.
+* Climatology data, from [github](https://github.com/brorfred/ocean_clustering).
 
-* Climatology data, from !()[], placed here:
+* Non-climatology data, from [netcdf files in a web server directory](https://rsg.pml.ac.uk/shared_files/brj/proj/CBIOMES/Justin/).
 
-* Non-climatology data, from ~()[], placed here:
-
-* Depth data, downloaded from CMAP, placed here:
+* Depth data, downloaded from CMAP (not done yet):
 
 
 # Climatology data
 
 The **climatology** chlorophyll dataset is a monthly dataset having averaged 20
-years worth of data for each month (Jan-Dec).
+years worth of data for each month (January through December).
 
-There are multiple resolutions of this data; we mainly make use of the 2-degree resolution data.
+There are multiple resolutions of this data; we mainly make use of the 1-degree
+resolution data.
 
 ```{r climatology}
 ## Read in data
-datadir = "/home/sangwonh/Dropbox/research/usc/ocean-provinces/omd/data"
 filenames = c("tabulated_darwin_montly_clim_045_090_ver_0_2_6.csv",
-              "tabulated_darwin_montly_clim_090_180_ver_0_2_6.csv",
+              "tabulated_darwin_montly_clim_090_180_ver_0_2_6.csv", ## This will be used.
               "tabulated_darwin_montly_clim_180_360_ver_0_2_6.csv",
               "tabulated_darwin_montly_clim_360_720_ver_0_2_6.csv",
 
               "tabulated_geospatial_montly_clim_045_090_ver_0_2_5.csv",
-              "tabulated_geospatial_montly_clim_090_180_ver_0_2_5.csv",
+              "tabulated_geospatial_montly_clim_090_180_ver_0_2_5.csv", ## This will be used.
               "tabulated_geospatial_montly_clim_180_360_ver_0_2.csv", ## The 2.5 version is missing.
               "tabulated_geospatial_montly_clim_360_720_ver_0_2_5.csv")
 ddat = read.csv(file.path(datadir, filenames[2])) %>% as_tibble()
 rdat = read.csv(file.path(datadir, filenames[2+4])) %>% as_tibble()
+print(rdat)
+print(ddat)
 ```
+
+TODO: add a simple plot here (pipe out from `rdat`).
 
 # Non-climatology data
 
 Non-climatology dataset was compiled by Bror Johnsson and shared as netcdf
-files.
+(`.nc`) files. This data was further cleaned (code shown furtherbelow) and saved
+as RDS files containing data frames between 1998 through 2001. These RDS files
+are named like this:
 
-```{r nonclimatology}
-print('Hi world')
+`filename = paste0(type, "-nonclim-", year, "-", mo, ".RDS")`
+
+where `type` is one of "darwin" or "real" (meaning remote sensing), and `year`
+is one of {1998, 1999, 2000, 2001}, and `mo` is month number 1, ..., 12.
+
+```{r nonclimatology, fig.width = 5, fig.height = 5}
+type = "real"
+year = 2000
+mo = 6
+filename = paste0(type, "-nonclim-", year, "-", mo, ".RDS")
+folder = paste0(type, "-nonclim")
+one_month_dat = readRDS(file = file.path(datadir, folder, filename))
+mo = unique(one_month_dat$mo)
+year = unique(one_month_dat$year)
+one_month_dat %>% 
+  plot_dat(add_map = TRUE) +
+  ggtitle(paste0(month.abb[mo], ",", year)) +
+  theme(plot.title = element_text(size = rel(2), face = "bold"))
 ```
+
+This data files (named e.g. `darwin-nonclim-2000-1.RDS`) were cleaned and
+produced using this code (not run now):
+
+```{r clean-nonclim, eval=FALSE}
+## Latitude/longitude range 
+lat = 19.8968
+lon = -155.5828
+boxsize = 40
+lonrange = lon + c(-1,1) * boxsize
+latrange = lat + c(-1,1) * boxsize
+
+## Time indices, since this is too expensive to do in one swipe
+source("nonclim-helpers.R")
+for(dat_type in c("darwin", "real")){
+  cat("data type is ", dat_type, fill = TRUE)
+  if(dat_type == "darwin"){
+    timefile = file.path(datadir, "Justin_pacific_box_halfdegree_Darwin_time.csv")
+  }
+  if(dat_type == "real"){
+    timefile = file.path(datadir, "Justin_pacific_box_halfdegree_time.csv")
+  }
+  times = read.csv(timefile)
+  maxt = nrow(times)
+  x = 1:maxt
+  n = 20
+  indices = split(x, sort(x %% n))
+  num_groups = length(indices)
+  start.time = Sys.time()
+  for(ii in 1:num_groups){
+    printprogress(ii, num_groups, fill = TRUE, start.time = start.time)
+    ind = indices[[ii]]
+    dat = get_nonclim_dat(type = dat_type, datadir = datadir,
+                                 lonrange = lonrange,
+                                 latrange = latrange,
+                                 time_range = ind)
+    filename = paste0(dat_type, "-nonclim-", ii, ".RDS")
+    cat("saving to", filename, fill = TRUE)
+    saveRDS(dat, file = file.path(datadir, filename))
+  }
+}
+
+
+## Further process and save data.
+for(dat_type in c("darwin", "real")){
+  cat("data type is ", dat_type, fill = TRUE)
+  if(dat_type == "darwin"){
+    timefile = file.path(datadir, "Justin_pacific_box_halfdegree_Darwin_time.csv")
+  }
+  if(dat_type == "real"){
+    timefile = file.path(datadir, "Justin_pacific_box_halfdegree_time.csv")
+  }
+
+  ## Read in individual files (equal chunks of dates)
+  dat_list = list()
+  num_groups = 20
+  for(ii in 1:num_groups){
+    filename = paste0(dat_type, "-nonclim-", ii, ".RDS")
+    dat_list[[ii]] = readRDS(file = file.path(datadir, filename))
+  }
+
+  ## Combine and save
+  alldat = data.table::rbindlist(dat_list)
+  combined_filename = paste0(dat_type, "-nonclim-combined.RDS")
+  saveRDS(alldat, file = file.path(datadir, combined_filename))
+
+  ## Read in combined data
+  alldat = readRDS(file = file.path(datadir, combined_filename))
+
+  ## Split into individual months.
+  dlist = alldat %>% group_by(mo, year) %>% group_split()
+
+  ## Get 99th quantile of all chlorophyll values (to filter the extreme values)
+  maxval = alldat %>% summarize(q=quantile(val, 0.9999)) %>% unlist()
+  col_cuts = seq(from = 0, to = maxval, length=100)
+  rm(alldat)
+
+  ## Save each month-year into separate file.
+  for(ii in 1:length(dlist)){
+    printprogress(ii, length(dlist))
+
+    ## Extract month information
+    thismo = dlist[[ii]] %>% pull(mo) %>% unique()
+    thisyear = dlist[[ii]] %>% pull(year) %>% unique()
+    stopifnot((length(thismo) == 1) & (length(thisyear) == 1))
+
+    ## Aggregate to unique month (at original resolution)
+    one_month_dat = dlist[[ii]] %>%
+      dplyr::filter(mo == thismo) %>%
+      dplyr::filter(year == thisyear)
+
+    ## Sanity check 1: Plotting the Chlorophyll map.
+    plotfilename = paste0(dat_type, "-nonclim-", thisyear, "-", thismo, ".png")
+    plot_dat(one_month_dat, add_map = TRUE) +
+      ggtitle(paste0(month.abb[thismo], ",", thisyear)) +
+      theme(plot.title = element_text(size = rel(2), face = "bold")) +
+      ggsave(file.path(datadir, plotfilename), width=5, height=7, units="in")
+
+    ## Sanity check 2: Plotting but with the same colors in all plots.
+    plotfilename = paste0("samecol-", dat_type, "-nonclim-", thisyear, "-", thismo, ".png")
+    plot_dat(one_month_dat, add_map = TRUE) +
+      ggtitle(paste0(month.abb[thismo], ",", thisyear)) +
+      scale_fill_gradientn(colours = c("blue", "red", "yellow"),
+                           guide="colorbar", values = col_cuts) +
+      theme(plot.title = element_text(size = rel(2), face = "bold")) +
+      ggsave(file.path(datadir, plotfilename), width=5, height=7, units="in")
+
+    filename = paste0(dat_type, "-nonclim-", thisyear, "-", thismo, ".RDS")
+    saveRDS(one_month_dat, file = file.path(datadir, filename))
+  }
+}
+```
+
 
 # Depth data
 
@@ -91,3 +217,6 @@ The depth dataset has been downloaded from Simon's CMAP, from the tables "" and
 
 ```{r}
 ```
+
+
+# 

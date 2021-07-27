@@ -201,6 +201,8 @@ long_format_to_image <- function(dat){
   nlon = length(unique(dat$lon))
   lons_orig = sort(unique(dat$lon))
   lats_orig = sort(unique(dat$lat), decreasing = TRUE)
+  counts = dat %>% group_by(lat, lon) %>% count() %>% ungroup() %>% pull(n)
+  stopifnot(all(counts == 1))
 
   ## Ensure the column names are lat/lon/val
   stopifnot(all(colnames(dat) %in% c("lon", "lat", "val")))
@@ -224,8 +226,12 @@ long_format_to_image <- function(dat){
     image_to_long_format() %>%
     as_tibble() %>%
     dplyr::select(lon, lat, val) %>%
-    arrange(lon, lat)
-  stopifnot(all((dat %>% dplyr::arrange(lon, lat)) == dat2))
+    dplyr::arrange(lon, lat) %>%
+    drop_na()
+
+  ## (dat %>% dplyr::arrange(lon, lat))
+  ## (dat2 %>% dplyr::arrange(lon, lat))%>% drop_na()
+  stopifnot(identical((dat %>% dplyr::arrange(lon, lat)), (dat2 %>% dplyr::arrange(lon, lat))))
 
   ## Final checks
   stopifnot((nrow(img) == nlat) & (ncol(img) == nlon))

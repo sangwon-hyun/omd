@@ -225,7 +225,7 @@ enlarge <- function(d){
 
 ##' A sliding window average, of window size (\code{size} x \code{size}).
 ##'
-##' @param M Matrix.
+##' @param M Matrix of values you want to smooth.
 ##' @param size Size of sliding window.
 ##'
 ##' @return Smoothed matrix of the same size
@@ -235,8 +235,27 @@ smoothmat <- function(M, size){
   delta = (size - 1) / 2
   M_smoothed = ma.matrix(M, av = "mean", delta = delta, edgeNA = FALSE) ##%>% drawmat_precise()
   stopifnot(all(dim(M_smoothed) == dim(M)))
+  rownames(M_smoothed) = rownames(M)
+  colnames(M_smoothed) = colnames(M)
   return(M_smoothed)
   ##   smoothie::kernel2dsmooth(M, kernel.type="boxcar", n=bw)  %>% drawmat_precise()
+}
+
+##' A sliding window, of window size (\code{size} x \code{size}), is applied on
+##' the dataset.
+##'
+##' @param dat Dataset with lat, lon, val.
+smoothdat <- function(dat, size){
+
+  ## Basic checks
+  stopifnot(all(c("lat", "lon", "dat") %in% names(dat)))
+
+  ## Convert to matrix
+  dat %>% make_mat()
+
+  ## Apply smoothing
+
+
 }
 
 
