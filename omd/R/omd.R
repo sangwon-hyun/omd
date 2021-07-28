@@ -226,11 +226,16 @@ long_format_to_image <- function(dat){
     image_to_long_format() %>%
     as_tibble() %>%
     dplyr::select(lon, lat, val) %>%
-    dplyr::arrange(lon, lat) %>%
-    drop_na()
+    dplyr::arrange(lon, lat)
+    ## drop_na()
 
   ## (dat %>% dplyr::arrange(lon, lat))
   ## (dat2 %>% dplyr::arrange(lon, lat))%>% drop_na()
+
+  ## browser()
+  ## dat %>% drop_na() %>% dplyr::arrange(lon, lat)
+  ## dat2 %>% dplyr::arrange(lon, lat)
+
   stopifnot(identical((dat %>% dplyr::arrange(lon, lat)), (dat2 %>% dplyr::arrange(lon, lat))))
 
   ## Final checks

@@ -168,9 +168,10 @@ plot_omd_ggplot <- function(obj, plot_type = c("one", "four"),
     all_rows = all_rows %>% mutate(rng = cut(mass, breaks)) %>%
       mutate(rng = factor(rng, labels=c("Smallest mass (Q1)", "Q2", "Q3", "Largest mass (Q4)")))
 
-    ## Categorizing the according to top 90$ and the rest in the mass transfers.p + geom_sf(data = world) +
-    labs(x = "Longitude", y = "Latitude") +
-    coord_sf(xlim = lonrange, ylim = latrange, expand = FALSE)
+    ## ## Categorizing the according to top 90$ and the rest in the mass transfers.
+    ## p + geom_sf(data = world) +
+    ## labs(x = "Longitude", y = "Latitude") +
+    ## coord_sf(xlim = lonrange, ylim = latrange, expand = FALSE)
 
     breaks = all_rows$mass %>% quantile(c(0, 0.95,1))
     all_rows = all_rows %>% mutate(rng2 = cut(mass, breaks)) %>%
