@@ -255,6 +255,8 @@ smoothdat <- function(dat, size){
 
   ## Apply smoothing
 
+  ## Continue here.
+
 
 }
 
@@ -574,6 +576,7 @@ colfun <- function(vec){
 
 
 ##' Combine two dataframes
+##' @export
 combine <- function(d1, d2, name1="from", name2="to"){
 
   ## Setup
@@ -583,7 +586,7 @@ combine <- function(d1, d2, name1="from", name2="to"){
   twodat = merge(d1, d2, by = c("lat", "lon"),
                  suffixes = c(".from", ".to")) %>% as_tibble() %>%
     dplyr::rename(!!(name1) := val.from,
-           !!(name2) := val.to) %>%
+                  !!(name2) := val.to) %>%
     tidyr::pivot_longer(cols = cols, names_to = "dat_type", values_to = "val") %>%
     dplyr::select(lat, lon, dat_type, val) %>%
     mutate(dat_type = factor(dat_type, levels = c(name1, name2)))

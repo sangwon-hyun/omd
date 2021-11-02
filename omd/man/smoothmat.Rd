@@ -7,7 +7,7 @@
 smoothmat(M, size)
 }
 \arguments{
-\item{M}{Matrix.}
+\item{M}{Matrix of values you want to smooth.}
 
 \item{size}{Size of sliding window.}
 }

@@ -16,7 +16,8 @@ omd(
   p = 1,
   sinkhorn_lambda = 30,
   sinkhorn_eps = 1e-15,
-  sinkhorn_rel_eps = NULL
+  sinkhorn_rel_eps = NULL,
+  geodesic = FALSE
 )
 }
 \arguments{
@@ -37,6 +38,9 @@ as Euclidean distance.}
 \item{coordnames}{Defaults to \code{c("lon", "lat")}.}
 
 \item{type}{Defaults to "transport".}
+
+\item{geodesic}{If \code{TRUE}, use geodesic distances instead of euclidean
+distances.}
 }
 \value{
 Not written yet.

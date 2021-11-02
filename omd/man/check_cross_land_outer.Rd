@@ -4,9 +4,21 @@
 \alias{check_cross_land_outer}
 \title{Takes a long matrix in \code{coords}, and indices of lands \code{land_inds}}
 \usage{
-check_cross_land_outer(coords, land_coords, maxdist)
+check_cross_land_outer(
+  coords,
+  land_coords,
+  lonrange = NULL,
+  latrange = NULL,
+  verbose = FALSE,
+  mc.cores = 1
+)
+}
+\arguments{
+\item{coords}{data frame with lon & lat.}
+
+\item{land_coords}{coordinates with lon & lat.}
 }
 \description{
 Calculate a binary matrix of size \code{nrow(coords)} x \code{nrow(coords)}
-(the same size as a cost matrix) that marks where the problem
+(the same size as a cost matrix) that marks where the problem.
 }

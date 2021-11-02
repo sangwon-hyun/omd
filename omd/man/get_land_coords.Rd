@@ -2,9 +2,7 @@
 % Please edit documentation in R/landcrossing.R
 \name{get_land_coords}
 \alias{get_land_coords}
-\title{From a long data frame with lat, lon, obtain the land indices by (1)
-completing the rectangle, and (2) marking the overlaps with land using
-\code{mark_land()}.}
+\title{From a long data frame with lat, lon, obtain the land indices by}
 \usage{
 get_land_coords(dat)
 }
@@ -15,7 +13,8 @@ get_land_coords(dat)
 Subset of the rows of \code{dat} that are land.
 }
 \description{
-From a long data frame with lat, lon, obtain the land indices by (1)
-completing the rectangle, and (2) marking the overlaps with land using
-\code{mark_land()}.
+(1) completing the rectangle, and
+}
+\details{
+(2) marking the overlaps with land using \code{mark_land()}.
 }

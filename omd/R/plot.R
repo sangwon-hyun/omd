@@ -138,7 +138,12 @@ plot_omd_ggplot <- function(obj, plot_type = c("one", "four"),
                             name_from = NULL, name_to = NULL,
                             add_map = FALSE,
                             classify_quantile = TRUE,
-                            sample_arrows = FALSE){
+                            sample_arrows = FALSE,
+                            map_projection = TRUE,
+                            map_orientation = c(-36.92, 200,0),
+                            return_arrows = FALSE,
+                            arrow_range = c(1E-3, 2)
+                            ){
 
   ## Setup
   ## stopifnot(class(obj) == "omd")
@@ -147,7 +152,10 @@ plot_omd_ggplot <- function(obj, plot_type = c("one", "four"),
 
   ## Get the transport table, get rid of same-cell transfers.
   tab = obj$transport_object %>% filter(from!=to)
-  if(sample_arrows) tab = tab[seq(from = 1, to = nrow(tab), length=nrow(tab)/3), ]
+  if(sample_arrows){
+    arrow_inds = seq(from = 1, to = nrow(tab), length=nrow(tab)/2)
+    tab = tab[arrow_inds, ]
+  }
   nr = nrow(tab)
 
   ## Transform to lat/lon coordinates on things
@@ -160,6 +168,7 @@ plot_omd_ggplot <- function(obj, plot_type = c("one", "four"),
     cbind(fr_coord, to_coord, mass = mass)
   })
   all_rows = do.call(rbind, all_rows) %>% as_tibble()
+  if(return_arrows) return(all_rows)
 
   if(classify_quantile){
     ## Categorizing the according to QUARtiles in the mass transfers.
@@ -174,10 +183,11 @@ plot_omd_ggplot <- function(obj, plot_type = c("one", "four"),
     ## coord_sf(xlim = lonrange, ylim = latrange, expand = FALSE)
 
     breaks = all_rows$mass %>% quantile(c(0, 0.95,1))
-    all_rows = all_rows %>% mutate(rng2 = cut(mass, breaks)) %>%
-    mutate(rng2 = factor(rng2, labels = c("rest", "Largest mass (90%+)")))
+    all_rows = all_rows %>%
+      mutate(rng2 = cut(mass, breaks)) %>%
+      mutate(rng2 = factor(rng2, labels = c("rest", "Largest mass (90%+)")))
   } else {
-    all_rows = all_rows %>% add_column(rng2 = "red")
+    all_rows = all_rows %>% add_column(rng2 = "all") ##adjustcolor("blue", alpha = .5))
   }
 
   ## Make the transfer plot
@@ -187,7 +197,7 @@ plot_omd_ggplot <- function(obj, plot_type = c("one", "four"),
 
   if(plot_type == "one"){
     p = all_rows %>% ggplot() +
-      geom_raster(aes(x = lon, y = lat, fill = val),
+      geom_tile(aes(x = lon, y = lat, fill = val),
                   dat = before_dat) +
       scale_fill_gradientn(colours = c("white", "black"), guide="colorbar") +
       ## facet_wrap(~rng) +
@@ -197,18 +207,19 @@ plot_omd_ggplot <- function(obj, plot_type = c("one", "four"),
                        yend = to_lat,
                        size = mass,
                        col = rng2),
-                   arrow = arrow(length = unit(0.05, "inches"))) +
+                   ## arrow = arrow(length = unit(0.05, "inches"))) +
+                   arrow = arrow(length = unit(0.025, "inches"))) +
       theme_minimal() +
       theme(legend.position = "none") +
-      scale_size_continuous(range = c(1E-3, 2)) +
+      scale_size_continuous(range = arrow_range) +
       ylab("Latitude") +
       xlab("Longitude")  +
       coord_fixed(ratio = 1)
 
     if(classify_quantile){
-      p = p + scale_color_manual(values=c("rest"=rgb(0,0,1,0.01), "Largest mass (90%+)"=rgb(1,0,0, 0.4)))
+      p = p + scale_color_manual(values=c("rest"=rgb(0,0,1,0.1), "Largest mass (90%+)"=rgb(1,0,0, 0.4)))
     } else {
-      ## p = p + scale_color_manual("red"= rgb(1,0,0,0.2))
+      p = p + scale_color_manual(values = c("all" = rgb(1,0,0,0.2)))
     }
   }
 
@@ -216,7 +227,7 @@ plot_omd_ggplot <- function(obj, plot_type = c("one", "four"),
 
     ## Four plots
     p = all_rows %>% ggplot() +
-      geom_raster(aes(x = lon, y = lat, fill = val), dat = before_dat) +
+      geom_tile(aes(x = lon, y = lat, fill = val), dat = before_dat) +
       scale_fill_gradientn(colours = c("white", "black"), guide="colorbar") +
       facet_wrap(~rng) +
       geom_segment(aes(x = fr_lon, y = fr_lat, xend = to_lon, yend = to_lat, size = mass),
@@ -236,23 +247,36 @@ plot_omd_ggplot <- function(obj, plot_type = c("one", "four"),
   p = p + ggtitle(label = mytitle, subtitle = mysubtitle)
 
   ## Other style elements
-  p = p + theme(plot.title = element_text(size = rel(1.3), colour = "black", face = "bold"))
-  p = p + theme(axis.text = element_text(size = rel(0.9)),
-                axis.title = element_text(size = rel(1.3), face="bold"))
-  p = p +  theme(plot.title = element_text(hjust = 0.5),
-                 plot.subtitle = element_text(hjust = 0.5))
+  ## p = p + theme(plot.title = element_text(size = rel(1.3), colour = "black", face = "bold"))
+  ## p = p + theme(axis.text = element_text(size = rel(0.9)),
+  ##               axis.title = element_text(size = rel(1.3), face="bold"))
+  ## p = p +  theme(plot.title = element_text(hjust = 0.5),
+  ##                plot.subtitle = element_text(hjust = 0.5))
 
-  p = p + theme(strip.text.x = element_text(size = rel(1.3)))
+  ## p = p + theme(strip.text.x = element_text(size = rel(1.3)))
+
+
+  p = p + theme(strip.text = element_text(size = rel(1.2), colour = "black", face = "bold"))
+
+  p = p + theme(axis.text = element_text(size = rel(0.9)),
+                axis.title = element_text(size = rel(1.2)))##, face="bold"))
+
+  p = p + theme(strip.text.x = element_text(size = rel(1.2)))
 
   ## Add map elements
   if(add_map){
-  latrange = obj$M1_long %>% pull(lat) %>% range()
-  lonrange = obj$M1_long %>% pull(lon) %>% range()
-  world <- rnaturalearth::ne_countries(scale = "medium", returnclass = "sf")
-  p = p + geom_sf(data = world, inherit.aes = F)+
-    coord_sf(xlim = lonrange, ylim = latrange, expand = FALSE,
-             label_axes = list(bottom = "E", right = "N"))
-    ## theme(axis.title.y = element_text(vjust=-20))
+    world <- rnaturalearth::ne_countries(scale = "medium", returnclass = "sp")
+    p = p + geom_polygon(data = world,
+                         aes(x = long, y = lat, group = group),
+                         fill = "white", colour = "grey70")
+  }
+
+  if(map_projection){
+    latrange = obj$M1_long %>% pull(lat) %>% range()
+    lonrange = obj$M1_long %>% pull(lon) %>% range()
+    p = p + coord_map("azequalarea",
+                      orientation = map_orientation,
+                      ylim = latrange, xlim = lonrange)
   }
 
   return(p)
@@ -274,7 +298,12 @@ plot_omd_ggplot <- function(obj, plot_type = c("one", "four"),
 ##'
 ##' @export
 plot_dat <- function(longdat = NULL, mat = NULL, valname = NULL, standardize = TRUE, hide_legend = TRUE,
-                     add_map = FALSE, colours = NULL, lonrange = NULL, latrange = NULL){
+                     add_map = FALSE, colours = NULL, lonrange = NULL, latrange = NULL,
+                     map_projection = TRUE,
+                     map_orientation = c(-36.92, 200,0),
+                     limits = NULL, breaks = waiver(),## for color scale
+                     legend_name = waiver()
+                     ){
 
   ## Basic checks
   assertthat::assert_that(!is.null(mat) | !is.null(longdat))
@@ -300,35 +329,44 @@ plot_dat <- function(longdat = NULL, mat = NULL, valname = NULL, standardize = T
   if(is.null(colours)) colours = c("blue", "red", "yellow")
 
   ## Make a facet plot
+  print(range(longdat$val, na.rm = TRUE))
   p = longdat %>%
     group_by(dat_type) %>%
     ggplot() +
     facet_grid(.~dat_type)  +
-    geom_raster(aes(x = lon, y = lat, fill = !!sym(valname))) +
+    geom_tile(aes(x = lon, y = lat, fill = !!sym(valname))) +
+    scale_fill_gradientn(colours = colours, limits = limits, breaks = breaks, name = legend_name)+
     theme_minimal() +
-    scale_fill_gradientn(colours = colours, guide="colorbar") +
+    ## scale_fill_gradientn(colours = colours, guide="colorbar", limits = limits, breaks = breaks) +
+    ## scale_fill_gradientn(colours = colours, ## limits = limits,
+    ##                      breaks = breaks) +
     ylab("Latitude") + xlab("Longitude") +
     coord_fixed(ratio = 1)
 
   if(hide_legend) p = p + theme(legend.position = "none")
 
   ## Other style elements
-  p = p + theme(strip.text = element_text(size = rel(1.3), colour = "black", face = "bold"))
+  p = p + theme(strip.text = element_text(size = rel(1.2), colour = "black"))##, face = "bold"))
+
   p = p + theme(axis.text = element_text(size = rel(0.9)),
-                axis.title = element_text(size = rel(1.3), face="bold"))
-  p = p + theme(strip.text.x = element_text(size = rel(1.3)))
+                axis.title = element_text(size = rel(1.2)))##, face="bold"))
+
+  p = p + theme(strip.text.x = element_text(size = rel(1.2)))
 
   ## Add map elements
   if(add_map){
+    world <- rnaturalearth::ne_countries(scale = "medium", returnclass = "sp")
+    p = p + geom_polygon(data = world,
+                         aes(x = long, y = lat, group = group),
+                         fill = "white", colour = "grey70")
+  }
+
+  if(map_projection){
     if(is.null(latrange)) latrange = longdat %>% pull(lat) %>% range()
     if(is.null(lonrange)) lonrange = longdat %>% pull(lon) %>% range()
-    world <- ne_countries(scale = "medium", returnclass = "sf")
-    p = p + geom_sf(data = world, inherit.aes = TRUE) +
-      coord_sf(xlim = lonrange, ylim = latrange, expand = FALSE,
-               label_axes = list(bottom = "E", right = "N")) +
-      theme(panel.grid.major = element_line(color = "gray60", linetype = "dashed", size = 0.25),
-            panel.background = element_rect(fill = "grey80"))
-      ## theme(axis.title.y = element_text(vjust=-20))
+    p = p + coord_map("azequalarea",
+                      orientation = map_orientation,##c(-36.92, 200,0),
+                      ylim = latrange, xlim = lonrange)
   }
 
 

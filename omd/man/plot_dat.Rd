@@ -13,7 +13,12 @@ plot_dat(
   add_map = FALSE,
   colours = NULL,
   lonrange = NULL,
-  latrange = NULL
+  latrange = NULL,
+  map_projection = TRUE,
+  map_orientation = c(-36.92, 200, 0),
+  limits = NULL,
+  breaks = waiver(),
+  legend_name = waiver()
 )
 }
 \arguments{

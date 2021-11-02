@@ -12,7 +12,7 @@ form_geodesic_cost_matrix(dat)
 "lon".}
 }
 \value{
-p x p cost matrix.
+p x p cost matrix in geodesic distance (unit: kilometers).
 }
 \description{
 Converts a matrix with `n` rows and with columns `lat`, `lon`, into a cost

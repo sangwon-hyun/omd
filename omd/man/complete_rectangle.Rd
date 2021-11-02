@@ -2,7 +2,7 @@
 % Please edit documentation in R/landcrossing.R
 \name{complete_rectangle}
 \alias{complete_rectangle}
-\title{Takes a data matrix with columns: month, lat, lon, val. Then, it makes the
+\title{Takes a data matrix with columns: lat, lon, val. Then, it makes the
 grid a complete rectangle; more specifically, it adds new rows with lat/lon
 values that were missing in \code{dat}, and adds rows with empty (NA) values
 to the matrix.}
@@ -16,7 +16,7 @@ complete_rectangle(dat)
 Completed data
 }
 \description{
-Takes a data matrix with columns: month, lat, lon, val. Then, it makes the
+Takes a data matrix with columns: lat, lon, val. Then, it makes the
 grid a complete rectangle; more specifically, it adds new rows with lat/lon
 values that were missing in \code{dat}, and adds rows with empty (NA) values
 to the matrix.

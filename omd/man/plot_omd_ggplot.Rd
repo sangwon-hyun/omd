@@ -12,7 +12,11 @@ plot_omd_ggplot(
   name_to = NULL,
   add_map = FALSE,
   classify_quantile = TRUE,
-  sample_arrows = FALSE
+  sample_arrows = FALSE,
+  map_projection = TRUE,
+  map_orientation = c(-36.92, 200, 0),
+  return_arrows = FALSE,
+  arrow_range = c(0.001, 2)
 )
 }
 \arguments{

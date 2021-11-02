@@ -12,6 +12,8 @@
 ##' @param M1_long Long matrix, with a column called "val".
 ##' @param M2_long Another long matrix, with a column called "val"
 ##' @param coordnames Defaults to \code{c("lon", "lat")}.
+##' @param geodesic If \code{TRUE}, use geodesic distances instead of euclidean
+##'   distances.
 ##'
 ##' @return Not written yet.
 ##'
@@ -29,7 +31,8 @@ omd <- function(M1 = NULL,
                 p = 1,
                 sinkhorn_lambda = 30,
                 sinkhorn_eps = 1E-15,
-                sinkhorn_rel_eps = NULL
+                sinkhorn_rel_eps = NULL,
+                geodesic = FALSE ##
                 ){
 
   ## Setup
@@ -58,12 +61,17 @@ omd <- function(M1 = NULL,
   M1_long_na = M1_long %>% as_tibble() %>% filter(is.na(val)) ##%>% dplyr::select(lon, lat)
   M2_long_na = M2_long %>% as_tibble() %>% filter(is.na(val)) ##%>% dplyr::select(lon, lat)
   if(nrow(M1_long_na) > 0 | nrow(M2_long_na) > 0){
-    na_coords = bind_rows(M1_long_na, M2_long_na) %>% dplyr::select(!!!syms(coordnames))
+    na_coords = bind_rows(M1_long_na, M2_long_na) %>% dplyr::select(!!!syms(coordnames)) %>% unique()
     M1_long = anti_join(M1_long, na_coords, by = coordnames)
     M2_long = anti_join(M2_long, na_coords, by = coordnames)
+
+    ## ## If cost matrix is provided, take subsets of rows & columns
+    M1_remove_row = left_join(M1_long_orig, add_column(na_coords, na = TRUE)) %>% pull(na)
+    M2_remove_row = left_join(M2_long_orig, add_column(na_coords, na = TRUE)) %>% pull(na)
+    costm = costm[-which(M1_remove_row), -which(M2_remove_row)]
   }
 
-  ## Check if the coordinates match up exactly.
+  ## Check if the coordinates match up exactly (this isn't actually necessary..)
   M1_long_coords = M1_long %>% dplyr::select(!!!syms(coordnames))
   M2_long_coords = M2_long %>% dplyr::select(!!!syms(coordnames))
   stopifnot(all( M1_long_coords == M2_long_coords ))
@@ -74,8 +82,28 @@ omd <- function(M1 = NULL,
 
   ## Make cost matrix
   if(is.null(costm)){
-    costm = form_cost_matrix(M1_long)
+    if(geodesic){
+      costm = form_geodesic_cost_matrix(M1_long)
+    } else {
+      costm = form_cost_matrix(M1_long)
+    }
   }
+
+
+  ## ## Temporary
+  ## if(nrow(M1_long_na) > 0 | nrow(M2_long_na) > 0){
+  ##   na_coords = bind_rows(M1_long_na, M2_long_na) %>% dplyr::select(!!!syms(coordnames))
+  ##   ## M1_long = anti_join(M1_long, na_coords, by = coordnames)
+  ##   ## M2_long = anti_join(M2_long, na_coords, by = coordnames)
+
+  ##   ## ## If cost matrix is provided, take subsets of rows & columns
+  ##   browser()
+  ##   M1_remove_row = full_join(M1_long_orig, na_coords %>% add_column(na = TRUE)) %>% pull(na)
+  ##   M2_remove_row = full_join(M2_long_orig, na_coords %>% add_column(na = TRUE)) %>% pull(na)
+  ##   costm = costm[-which(M1_remove_row), -which(M2_remove_row)]
+  ## }
+  ## ## End of Temporary
+
 
   if(type == "sinkhorn"){
 
@@ -90,7 +118,6 @@ omd <- function(M1 = NULL,
     transport_res = NULL
   }
   if(type == "transport"){
-
     transport_res <- transport::transport(M1_long %>% pull(val),
                                           M2_long %>% pull(val),
                                           costm = costm^p)
@@ -98,6 +125,7 @@ omd <- function(M1 = NULL,
                                   M2_long %>% pull(val),
                                   costm = costm^p,
                                   tplan = transport_res)
+    costm
     sinkhorn_res = NULL
   }
 
@@ -131,8 +159,9 @@ form_cost_matrix <- function(dat, geodesic = FALSE){
   stopifnot("lat" %in% colnames(dat))
   stopifnot("lon" %in% colnames(dat))
   if(!geodesic){
-    return(dat %>% dplyr::select(lat, lon) %>% dist() %>% as.matrix())
+    return(form_geodesic_cost_matrix(dat))
   } else {
+    ## return(dat %>% dplyr::select(lat, lon) %>% dist() %>% as.matrix())
     return(dat %>% dplyr::select(lat, lon) %>% dist() %>% as.matrix())
   }
 }
@@ -145,14 +174,15 @@ form_cost_matrix <- function(dat, geodesic = FALSE){
 ##'
 ##' @importFrom magrittr "%>%"
 ##'
-##' @return p x p cost matrix.
+##' @return p x p cost matrix in geodesic distance (unit: kilometers).
 ##'
 ##' @export
 form_geodesic_cost_matrix <- function(dat){
-  ## dat = image_to_long_format(img1)
+ ## dat = image_to_long_format(img1)
   stopifnot("lat" %in% colnames(dat))
   stopifnot("lon" %in% colnames(dat))
-  distmat = (dat %>% dplyr::select(lat, lon) %>% geodist(measure="geodesic") %>% as.matrix())
+  distmat = (dat %>% dplyr::select(lat, lon) %>% geodist::geodist(measure="geodesic") %>% as.matrix())
+  distmat = distmat / 1000 ## converting to KM
   return(distmat)
 }
 
@@ -226,17 +256,10 @@ long_format_to_image <- function(dat){
     image_to_long_format() %>%
     as_tibble() %>%
     dplyr::select(lon, lat, val) %>%
-    dplyr::arrange(lon, lat)
-    ## drop_na()
+    dplyr::arrange(lon, lat) %>%
+    drop_na()
 
-  ## (dat %>% dplyr::arrange(lon, lat))
-  ## (dat2 %>% dplyr::arrange(lon, lat))%>% drop_na()
-
-  ## browser()
-  ## dat %>% drop_na() %>% dplyr::arrange(lon, lat)
-  ## dat2 %>% dplyr::arrange(lon, lat)
-
-  stopifnot(identical((dat %>% dplyr::arrange(lon, lat)), (dat2 %>% dplyr::arrange(lon, lat))))
+  stopifnot(identical((dat %>% drop_na() %>% dplyr::arrange(lon, lat)), (dat2 %>% dplyr::arrange(lon, lat))))
 
   ## Final checks
   stopifnot((nrow(img) == nlat) & (ncol(img) == nlon))

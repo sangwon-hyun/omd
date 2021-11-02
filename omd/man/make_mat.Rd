@@ -5,11 +5,13 @@
 \title{Helper function to take dataset and make matrix that contains Chl, lat, and
 lon. DONT USE IF data is not on a grid.}
 \usage{
-make_mat(dat)
+make_mat(dat, datname = "Chl")
 }
 \arguments{
 \item{dat}{A matrix that contains Chl, lat and lon; places them on a grid of
 values based on Chl, lat and lon.}
+
+\item{datname}{Optionally, provide data name other than "Chl".}
 }
 \value{
 Matrix
