@@ -24,14 +24,16 @@ solution closer to the exact Wasserstein distance.}
 
 \item{eps}{Tolerance for stopping the algorithm, in terms of row sums of P.}
 
+\item{rel_eps}{Relative tolerance.}
+
 \item{costmat}{(m x n) Cost matrix}
 
 \item{verbose}{Set to \code{TRUE} if you want loud code. Defaults to \code{TRUE}}
 }
 \value{
-List containing three things; `dist`, the sinkhorn distance, `costm`
-  the original cost matrix, `transports` is an (m x n) matrix of the optimal
-  (regularized) transports.
+List containing three things; \code{dist}, the sinkhorn distance,
+  \code{costm} the original cost matrix, \code{transports} is an (m x n)
+  matrix of the optimal (regularized) transports.
 }
 \description{
 Calculate Sinkhorn distance.

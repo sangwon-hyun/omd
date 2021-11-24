@@ -1,95 +1,3 @@
-##' Plots a vector field that characterizes the optimal transport.
-##'
-##' @param jan.dat one dataset.
-##' @param feb.dat another dataset
-##'
-##' @return The transport result.
-##' @export
-plot_vf <- function(jan.dat, feb.dat, res){
-
-
-  ## Make point sizes
-  jan.cex = jan.dat[,"Chl"]
-  jan.cex = jan.cex/sum(jan.cex) * length(jan.cex)
-  feb.cex = feb.dat[,"Chl"]
-  feb.cex = feb.cex/sum(feb.cex) * length(feb.cex)
-
-  ## Make points
-  plot(x=jan.dat[,"lon"], y=jan.dat[,"lat"], cex=jan.cex, col='blue', pch=16)
-  points(x=feb.dat[,"lon"], y=feb.dat[,"lat"], cex=feb.cex, col='red', pch=16)
-
-  ## Overlay the smaller January points once again (commented out for now)
-  inds = which(feb.cex < jan.cex)
-  jan.cex[inds] = 0
-  points(x = jan.dat[,"lon"], y = jan.dat[,"lat"],
-         cex = jan.cex, col = 'blue', pch = 16)
-
-  ## make the line segments
-  from_indices <- res$from##a$from[nonzero]
-  to_indices <- res$to##a$to[nonzero]
-
-
-  ## Get masses
-  masses = res$mass
-  nomove = which(from_indices == to_indices)
-  masses[-nomove] = 0
-  masses = masses / max(masses) * 10
-  for (ii in 1:length(from_indices)){
-    if(ii %in% nomove) next
-    shift = rnorm(1,0,0.1)
-
-    yco <- rev(gg[, 1])
-    xco <- gg[, 2]
-
-    wh <- which(res$from != res$to)
-    for(whi in wh){
-    arrows(xco[rs$from[whi]], yco[rs$from[whi]],
-           xco[rs$to[whi]], yco[rs$to[whi]], angle = 5,
-           length, col = arrcols[whi], lwd = lwd)
-    }
-  }
-
-  return(res)
-}
-
-
-##' Compute the wasserstein distance using the algorithm by Aurenhammer,
-##' Hoffmann and Aronov (1998) for finding optimal transference plans in terms
-##' of the squared Euclidean distance in two dimensions.
-##'
-##' @param p1 The first \code{pgrid} object.
-##' @param p2 The second \code{pgrid} object.
-##'
-##' @return The Wasserstein distance
-##'
-##' @export
-compute_wasserstein <- function(p1, p2){
-
-  res <- transport::transport(p1, p2, p = 2, method = "aha")
-  transport::wasserstein(p1, p2, p = 2, tplan = res)
-
-}
-
-
-##' Make a vector of colors that are all blue, except for the top \code{prob}
-##' quantile of mass transfers.
-##'
-##' @param res An object from \code{transform::transform()}.
-##' @param prob Defaults to 0.1.
-##'
-##' @return A vector of colors, mostly blue, except for the top \code{prob}
-##'   quantile.
-##'
-##' @export
-make_colors <- function(res, prob = 0.1){
-  cutoffs = quantile(res$mass, probs = c(1-prob, 1))
-  ii = 1
-  massrange = cutoffs[ii:(ii+1)]
-  cols = rep(rgb(0,0,1,0.2), length(res$mass)) ## blue for all else
-  cols[which(massrange[1] < res$mass & res$mass < massrange[2])] = rgb(1,0,0,0.7) ## red for the large ones
-  cols
-}
-
 ##' Fill in NA from surrounding values.
 ##'
 ##' @param mat A matrix with possibly missing values
@@ -537,10 +445,6 @@ get_time_space_box <- function(dat, mo, latrange, lonrange, fill_na = FALSE){
 }
 
 
-
-
-
-
 ##' Scales \code{x} into between 0 and 1.
 range01 <- function(x, ...){(x - min(x, ...)) / (max(x, ...) - min(x, ...))}
 
@@ -559,23 +463,13 @@ colfun <- function(vec){
 }
 
 
-## ##' Checks crossing
-## check_crossing <- function(lat1, lat2, lon1, lon2){
-
-##   ## Two coordinates
-##   coord1 = c(lon1, lat1)
-##   coord2 = c(lon2, lat2)
-
-##   ## Find all coordinates to check.
-##   get_all_land_coordinates <- funciton(){
-##   }
-
-##   lat, lon
-
-## }
-
-
-##' Combine two dataframes
+##' Combine two dataframes with columns in (lat, lon, val).
+##'
+##' @param d1 One data frame.
+##' @param d2 Another data frame.
+##' @param name1 Name for \code{d1}, to go to the column \code{dat_type}.
+##' @param name2 Name for \code{d2}.
+##'
 ##' @export
 combine <- function(d1, d2, name1="from", name2="to"){
 

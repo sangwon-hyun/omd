@@ -1,139 +1,24 @@
-##' Base R plotting of the optimal transport. Produces three figures: (1) The
-##' "before" image, (2) the "after" image, and (3) the optimal transports.
+##' ggplot-based plotting of the optimal transport.
 ##'
-##' @param obj An omd object.
-##' @param colfun A function that takes in a numeric vector of numbers between 0
-##'   and 1, and produces a vector of colors, to use for plotting the grid.
-##' @param main1 Title of first image.
-##' @param main2 Title of second image.
-##' @param cex Size of the squares to plot in a grid.
-##' @param maxcol Maximum value to use for color evaluation
-##'
-##' @export
-plot_omd <- function(obj, lwd_max = 10, colfun = NULL, cex = 3, maxcol = NULL,
-                     main1 = NULL, main2 = NULL, ...){
-
-
-  ## Get all the transfers
-  mat = obj$transport_obj
-  all_transfers = mat[,"mass"]
-  ## cutoff = quantile(all_transfers, 0.1)
-
-  ## Setup
-  if(is.null(maxcol)) maxcol = max(obj$M1_long[,"val"], obj$M2_long[,"val"])
-  nr = max(obj$M2_long$lat)
-  if(is.null(main1))main1 = "From"
-  if(is.null(main2))main2 = "To"
-
-
-  ## Make the three plots.
-  par(mfrow = c(1, 3))
-  base_r_plot(obj$M1_long[,"lon", drop=TRUE],
-              obj$M1_long[,"lat", drop=TRUE],
-              max(obj$M1_long[,"lat", drop=TRUE]),
-              val = obj$M1_long[,"val", drop=TRUE],
-              main = main1,
-              colfun = colfun,
-              cex_dat = cex_dat,
-              maxcol = maxcol,
-              ...)
-
-  base_r_plot(obj$M2_long[,"lon", drop=TRUE],
-              obj$M2_long[,"lat", drop=TRUE],
-              max(obj$M2_long[,"lat", drop=TRUE]),
-              val = obj$M2_long[,"val", drop=TRUE],
-              main = main2,
-              colfun = colfun,
-              cex_dat = cex_dat,
-              maxcol = maxcol,
-              ...)
-
-  bw_colfun <- function(cols){ cols %>% sapply(., function(col)rgb(0, 0, 0, col))}
-  base_r_plot(obj$M1_long[,"lon", drop=TRUE],
-              obj$M1_long[,"lat", drop=TRUE],
-              max(obj$M1_long[,"lat", drop=TRUE]),
-              val = obj$M1_long[,"val", drop=TRUE],
-              main = "Mass transports",
-              colfun = bw_colfun,
-              cex_dat = cex_dat,
-              ...)
-
-  ## Add the Arrows
-  lwd = mat[,"mass", drop=TRUE]
-  lwd = lwd/max(lwd)*lwd_max
-  for(ii in 1:nrow(mat)){
-    one_transfer = mat[ii,, ]
-
-    ## Map the transfers
-    coord_from = obj$M1_long[one_transfer[,"from"], c("lon", "lat")] %>% unlist()
-    coord_to = obj$M1_long[one_transfer[,"to"], c("lon", "lat")] %>% unlist()
-
-    ## Skip the transfers to the same coordinate
-    if(all(coord_from == coord_to)) next
-
-    arrows(x0 = coord_from['lon'], y0 = nr-coord_from['lat'],
-           x1 = coord_to['lon'],   y1 = nr-coord_to['lat'],
-           col = "red" %>% adjustcolor(alpha = 0.3),
-           length = 0.1/2,
-           lwd = lwd[ii])
-  }
-}
-
-
-
-##' Base R plot for plotting latitude and longitude.
-##'
-##' @param lon Longitude.
-##' @param lat Latitude.
-##' @param maxlat Maximum latitude value.
-##' @param val Values to plot.
-##' @inheritParams plot_omd
-##'
-##' @export
-base_r_plot <- function(lon, lat, maxlat, val, colfun = NULL, maxcol = NULL,
-                        cex_dat = 3,
-                        ...){
-
-
-  ## Setup
-  if(is.null(maxcol)){ maxcol = max(val) }
-
-  ## Define color function.
-  if(is.null(colfun)){
-    ramp <- colorRamp(c("blue", "white", "red"))
-    colfun <- function(cols){
-      ramp(cols) %>% apply(1, function(r.g.b)rgb(r.g.b[1], r.g.b[2], r.g.b[3], max = 255))
-    }
-  }
-
-  ## Define color function.
-  ## val = obj$M1_long[,"val"]
-  cols = val %>% pmax(0)
-  cols = (cols/maxcol) %>% sapply(., colfun)
-
-  ## Longitude
-  plot(x = lon,
-       y = maxlat - lat,
-       xlab = "lon",
-       ylab = "lat",
-       col = cols,
-       pch = 15,
-       cex = cex_dat,
-       ## xlab = "",
-       ## ylab = "",
-       ...)
-}
-
-
-
-##' ggplot-based plotting of the optimal transport. Produces three figures: (1)
-##' The "before" image, (2) the "after" image, and (3) the optimal transports.
-##'
-##' @param obj An omd object.
+##' @param obj An "omd" class object.
+##' @param plot_type One or four plots.
+##' @param add_map If \code{TRUE}, add a map of the coastline.
+##' @param classify_quantile If \code{TRUE}, classify into blue and red arrows;
+##'   otherwise just use blue arrows whose thickness.
+##' @param sample_arrows If \code{TRUE}, only plot half of the arrows.
+##' @param map_projection If \code{TRUE}, project onto the "globe", so the plot
+##'   appears curved.
+##' @param map_orientation Orientation to input to \code{coord_map()} from
+##'   \code{dplyr}. \url{https://ggplot2.tidyverse.org/reference/coord_map.html}
+##' @param return_arrows If \code{TRUE}, return a table containing information
+##'   about arrows.
+##' @param arrow_range Range of arrow thicknesses.
 ##'
 ##' @import ggplot2
 ##' @import sf
 ##' @import rnaturalearth
+##'
+##' @export
 plot_omd_ggplot <- function(obj, plot_type = c("one", "four"),
                             name_from = NULL, name_to = NULL,
                             add_map = FALSE,
@@ -282,6 +167,10 @@ plot_omd_ggplot <- function(obj, plot_type = c("one", "four"),
   return(p)
 }
 
+plot_omd = plot_omd_ggplot
+
+
+
 
 ##' Make a multi-panel plot of the data.
 ##'
@@ -297,13 +186,12 @@ plot_omd_ggplot <- function(obj, plot_type = c("one", "four"),
 ##' @return ggplot object.
 ##'
 ##' @export
-plot_dat <- function(longdat = NULL, mat = NULL, valname = NULL, standardize = TRUE, hide_legend = TRUE,
-                     add_map = FALSE, colours = NULL, lonrange = NULL, latrange = NULL,
-                     map_projection = TRUE,
-                     map_orientation = c(-36.92, 200,0),
+plot_dat <- function(longdat = NULL, mat = NULL, valname = NULL,
+                     standardize = TRUE, hide_legend = TRUE, add_map = FALSE,
+                     colours = NULL, lonrange = NULL, latrange = NULL,
+                     map_projection = TRUE, map_orientation = c(-36.92, 200,0),
                      limits = NULL, breaks = waiver(),## for color scale
-                     legend_name = waiver()
-                     ){
+                     legend_name = waiver()){
 
   ## Basic checks
   assertthat::assert_that(!is.null(mat) | !is.null(longdat))
@@ -329,7 +217,6 @@ plot_dat <- function(longdat = NULL, mat = NULL, valname = NULL, standardize = T
   if(is.null(colours)) colours = c("blue", "red", "yellow")
 
   ## Make a facet plot
-  print(range(longdat$val, na.rm = TRUE))
   p = longdat %>%
     group_by(dat_type) %>%
     ggplot() +
@@ -337,9 +224,6 @@ plot_dat <- function(longdat = NULL, mat = NULL, valname = NULL, standardize = T
     geom_tile(aes(x = lon, y = lat, fill = !!sym(valname))) +
     scale_fill_gradientn(colours = colours, limits = limits, breaks = breaks, name = legend_name)+
     theme_minimal() +
-    ## scale_fill_gradientn(colours = colours, guide="colorbar", limits = limits, breaks = breaks) +
-    ## scale_fill_gradientn(colours = colours, ## limits = limits,
-    ##                      breaks = breaks) +
     ylab("Latitude") + xlab("Longitude") +
     coord_fixed(ratio = 1)
 
@@ -373,12 +257,20 @@ plot_dat <- function(longdat = NULL, mat = NULL, valname = NULL, standardize = T
   return(p)
 }
 
-##' Add blob.
+
+
+
+##' helper to add patch (blob) to existing plot.
 ##'
 ##' @param longdat Data.
 ##' @param center lon, lat of center of the blob.
+##' @param sigma Covariance of Gaussian blob.
+##' @param fac How strong should this blob be.
+##' @param rotate how much to rotate the blob.
 ##'
-##' @return abc
+##' @return The resulting long dataset.
+##'
+##' @export
 add_blob <- function(longdat, center = c(-150, 15),
                      sigma = NULL,
                      fac = 60,

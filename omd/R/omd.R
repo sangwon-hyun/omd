@@ -1,5 +1,7 @@
-##' Calculate earthmovers distance between two images. They don't have to add up
-##' to 1.
+##' Calculate Wasserstein's distance between two images (either two matrices
+##' representing 2d pixelized images, or two long data frames with columns
+##' "lon", "lat", and "val"). The data does not need to be normalized. "omd"
+##' stands for Ocean Mover's Distance.
 ##'
 ##' @param M1 One matrix containing pixel values (m x n). The row names and
 ##'   column names of this matrix are assumed to contain longitude and latitude
@@ -9,13 +11,22 @@
 ##' @param costm Cost matrix \code{mm x mn}. If not provided, one is calculated
 ##'   as Euclidean distance.
 ##' @param type Defaults to "transport".
-##' @param M1_long Long matrix, with a column called "val".
-##' @param M2_long Another long matrix, with a column called "val"
+##' @param M1_long Long matrix, with a column called "val". If provided, this
+##'   supercedes \code{M1}.
+##' @param M2_long Another long matrix, with a column called "val". If provided,
+##'   this supercedes \code{M2}.
 ##' @param coordnames Defaults to \code{c("lon", "lat")}.
 ##' @param geodesic If \code{TRUE}, use geodesic distances instead of euclidean
 ##'   distances.
-##'
-##' @return Not written yet.
+##' @param type Whether to use Sinkhorn approximation, or the \code{R}
+##'   \code{transport} package.
+##' @param p Power of Wasserstein's distance.
+##' @param sinkhorn_lambda Regularization parameter for Sinkhorn.
+##' @param sinkhorn_eps Tolerance for Sinkhorn objective value.
+##' @param sinkhorn_rel_eps Relative tolerance for Sinkhorn objective value.
+##' @param geodesic Whether to use geodesic distance instead of Euclidean
+##'   distance.
+##' @return A list object with the results and data, of S3 class "omd".
 ##'
 ##' @importFrom assertthat assert_that
 ##' @import dplyr
@@ -125,7 +136,6 @@ omd <- function(M1 = NULL,
                                   M2_long %>% pull(val),
                                   costm = costm^p,
                                   tplan = transport_res)
-    costm
     sinkhorn_res = NULL
   }
 
@@ -146,8 +156,8 @@ omd <- function(M1 = NULL,
 ##' Converts a matrix with `n` rows and with columns `lat`, `lon`, into a cost
 ##' matrix of size (n x n).
 ##'
-##' @param Matrix whose rows are data points, and columns are named "lat" and
-##'   "lon".
+##' @param dat Matrix whose rows are data points, and columns are named "lat"
+##'   and "lon".
 ##'
 ##' @importFrom magrittr "%>%"
 ##'
@@ -169,8 +179,8 @@ form_cost_matrix <- function(dat, geodesic = FALSE){
 ##' Converts a matrix with `n` rows and with columns `lat`, `lon`, into a cost
 ##' matrix of size (n x n).
 ##'
-##' @param Matrix whose rows are data points, and columns are named "lat" and
-##'   "lon".
+##' @param data Matrix whose rows are data points, and columns are named "lat"
+##'   and "lon".
 ##'
 ##' @importFrom magrittr "%>%"
 ##'
@@ -181,6 +191,7 @@ form_geodesic_cost_matrix <- function(dat){
  ## dat = image_to_long_format(img1)
   stopifnot("lat" %in% colnames(dat))
   stopifnot("lon" %in% colnames(dat))
+  stopifnot(nrow(dat)>0)
   distmat = (dat %>% dplyr::select(lat, lon) %>% geodist::geodist(measure="geodesic") %>% as.matrix())
   distmat = distmat / 1000 ## converting to KM
   return(distmat)
@@ -270,7 +281,9 @@ long_format_to_image <- function(dat){
 }
 
 
-##' Print function for omd
+##' Print function for omd object.
+##'
+##' @param obj .
 print.omd <- function(obj){
   cat("Your OMD object came from two datasets of size",
       nrow(obj$M1_long), "x",

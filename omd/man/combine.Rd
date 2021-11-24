@@ -2,10 +2,19 @@
 % Please edit documentation in R/helpers.R
 \name{combine}
 \alias{combine}
-\title{Combine two dataframes}
+\title{Combine two dataframes with columns in (lat, lon, val).}
 \usage{
 combine(d1, d2, name1 = "from", name2 = "to")
 }
+\arguments{
+\item{d1}{One data frame.}
+
+\item{d2}{Another data frame.}
+
+\item{name1}{Name for \code{d1}, to go to the column \code{dat_type}.}
+
+\item{name2}{Name for \code{d2}.}
+}
 \description{
-Combine two dataframes
+Combine two dataframes with columns in (lat, lon, val).
 }

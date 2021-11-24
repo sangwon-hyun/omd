@@ -60,8 +60,6 @@ check_cross_land_outer <- function(coords, land_coords, lonrange = NULL, latrang
   M <- crossmat
   for(i in 1:nrow(M)) {for(j in 1:i) {M[i,j]=M[j,i] }}
   return(M)
-
-  ## return(crossmat)
 }
 
 
@@ -154,39 +152,55 @@ my_basic_setdiff <- function(a, b, check_if_a_in_b = TRUE){
 }
 
 
+##' Given lon and lat values, mark which guys are
+##'
 ##' @import spData
 ##' @import sf
-mark_land <- function(lon, lat, overreact=FALSE){
+##'
+##' @export
+mark_land <- function(lon, lat, overreact=FALSE, buffer_in_km = 500){
+
+  ## Basic setup
+  stopifnot(length(lon) == length(lat))
 
   ## Coordinates of land
   ## library(sf)
   ## library(spData) ## For `world`, an sf MULTIPOLYGON object
-  pts <- st_as_sf(data.frame(lon = lon, lat = lat),
-                  coords = 1:2, crs = 4326)
+  pts <- sf::st_as_sf(data.frame(lon = lon, lat = lat),
+                      coords = 1:2, crs = 4326)
+
+  ## Simply find which points intersect with land
   if(!overreact){
-    ## ## Find which points fall over land
+    ## Find which points fall over land
     world <- ne_countries(scale = "medium", returnclass = "sf")
     ii <- !is.na(as.numeric(st_intersects(pts, world)))
     return(ii)
 
+
+  ## Otherwise, use a particular technique
+  ## This is from https://gis.stackexchange.com/questions/373691/buffer-coastlines
   } else {
 
+    ## Defining coastal waters
     world <- ne_countries(scale = "medium", returnclass = "sf")
     ROI = ne_countries(scale = "medium", returnclass = 'sf') %>% st_combine()
-    ##KM/earth circumference * degrees in circle
-    buffer_in_km <- 250
-    buffer_as_arc_degrees<- buffer_in_km/40075*360
-
+    ## buffer_in_km <- 500
+    buffer_as_arc_degrees <- buffer_in_km / 40075 * 360
     coastalWaters = ROI %>%
       st_buffer(buffer_as_arc_degrees)  %>%
       st_wrap_dateline()
 
+    ## See if intersects with EITHER coastal waters (ii1) OR land (ii2).
     ii1 <- !is.na(as.numeric(st_intersects(pts, coastalWaters)))
     ii2 <- !is.na(as.numeric(st_intersects(pts, world)))
+
+    ## Some manual corrections with the coastal waters
     ii1[which(lat<25)] = FALSE
     ii1[which(lat<30 & lon< -140)] = FALSE
     ii1[which(lat<40 & lon< -150)] = FALSE
     ii1[which(lat>50 & lon< -160)] = TRUE
+
+    #
     ii = (ii1 | ii2)
 
   ## tibble(lon, lat, val=ii1) %>% plot_dat(add_map = FALSE, hide_legend = FALSE)
@@ -226,6 +240,8 @@ mark_land <- function(lon, lat, overreact=FALSE){
 ##' @param dat Data matrix.
 ##'
 ##' @return Completed data
+##'
+##' @export
 complete_rectangle <- function(dat){
 
   ## ## Basic check
@@ -259,6 +275,8 @@ complete_rectangle <- function(dat){
 
 ##' Same as \code{complete_rectangle} but doesn't need \code{month} or
 ##' \code{dat_type},.
+##'
+##' @export
 complete_rectangle_barebones <- function(dat){
   complete_grid = expand.grid(lat = dat$lat %>% unique(),
                               lon = dat$lon %>% unique()) %>% as_tibble()

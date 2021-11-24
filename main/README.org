@@ -1,38 +1,32 @@
-#+title: Analysis of Chlorophyll data using OMD
+#+title: Analysis of Chlorophyll data using Wasserstein distance
+#+author: Sangwon Hyun
 
-
-** Summary
-This repository contains the workflow for analyzing Chlorophyll data from
-various sources using Ocean Mover's Distance (OMD).
+This directory contains the workflow for analyzing Chlorophyll data from various
+sources using Wasserstein distance, for the paper here:
+[[https://arxiv.org/abs/2111.08736][https://arxiv.org/abs/2111.08736]].
 
 Here's an example of a comparison of two Chlorophyll maps from two sources
 #+ATTR_HTML: :style margin-left: auto; margin-right: auto;
 [[./climatology-transport-1.png]]
 
-** Installation and usage
-The scripts named e.g. ~00-import-data.Rmd~ are to be run in order of the files'
-numbers. The relevant data files and outputs are placed in an identically named
-directory called ~00-import-data~.
+** Usage
+The scripts named e.g. ~00-import-data.Rmd~ are to be run (knit) in order of the
+files' numbers. The relevant data files and outputs are placed in an identically
+named directory e.g. named ~./00-import-data~.
 
 ** Structure
 
 *** Obtaining and cleaning Chlorophyll data:
-[[.][00-import-data.html]]
+[[http://htmlpreview.github.io/?https://github.com/sangwon-hyun/omd/blob/master/main/00-import-data.html][00-import-data.html]]
 
-*** Compare model and remote-sensing data:
-Not added yet
-[[./01-cytograms.html][01-compare-model-data.html]]
+*** Climatology data analysis:
+[[http://htmlpreview.github.io/?https://github.com/sangwon-hyun/omd/blob/master/main/01-climatology.html][01-climatology.html]]
 
-*** Examine multiple scales of data
-Not added yet
-[[./02-estimate.html][02-multiscale.html]]
-
-*** Analyze depth profiles
-Not added yet
-[[./03-analyze.html][03-depth.html]]
+*** NON-Climatology data analysis:
+[[http://htmlpreview.github.io/?https://github.com/sangwon-hyun/omd/blob/master/main/02-nonclimatology.html][02-nonclimatology.html]]
 
 *** Cluster boundary comparison
-Not added yet
-[[./03-analyze.html][04-boundary.html]]
+[[http://htmlpreview.github.io/?https://github.com/sangwon-hyun/omd/blob/master/main/03-cluster-boundary.html][03-cluster-boundary.html]]
 
-
+*** Analyze depth profiles
+Separately contained in [[./depth-analysis-as-is]]; see the script [[./depth-analysis-as-is/DepthAnalysisManuscript.Rmd]].

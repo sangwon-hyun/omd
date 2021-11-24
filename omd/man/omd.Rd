@@ -2,8 +2,10 @@
 % Please edit documentation in R/omd.R
 \name{omd}
 \alias{omd}
-\title{Calculate earthmovers distance between two images. They don't have to add up
-to 1.}
+\title{Calculate Wasserstein's distance between two images (either two matrices
+representing 2d pixelized images, or two long data frames with columns
+"lon", "lat", and "val"). The data does not need to be normalized. "omd"
+stands for Ocean Mover's Distance.}
 \usage{
 omd(
   M1 = NULL,
@@ -31,21 +33,34 @@ sassumed.}
 \item{costm}{Cost matrix \code{mm x mn}. If not provided, one is calculated
 as Euclidean distance.}
 
-\item{M1_long}{Long matrix, with a column called "val".}
+\item{M1_long}{Long matrix, with a column called "val". If provided, this
+supercedes \code{M1}.}
 
-\item{M2_long}{Another long matrix, with a column called "val"}
+\item{M2_long}{Another long matrix, with a column called "val". If provided,
+this supercedes \code{M2}.}
 
 \item{coordnames}{Defaults to \code{c("lon", "lat")}.}
 
-\item{type}{Defaults to "transport".}
+\item{type}{Whether to use Sinkhorn approximation, or the \code{R}
+\code{transport} package.}
 
-\item{geodesic}{If \code{TRUE}, use geodesic distances instead of euclidean
-distances.}
+\item{p}{Power of Wasserstein's distance.}
+
+\item{sinkhorn_lambda}{Regularization parameter for Sinkhorn.}
+
+\item{sinkhorn_eps}{Tolerance for Sinkhorn objective value.}
+
+\item{sinkhorn_rel_eps}{Relative tolerance for Sinkhorn objective value.}
+
+\item{geodesic}{Whether to use geodesic distance instead of Euclidean
+distance.}
 }
 \value{
-Not written yet.
+A list object with the results and data, of S3 class "omd".
 }
 \description{
-Calculate earthmovers distance between two images. They don't have to add up
-to 1.
+Calculate Wasserstein's distance between two images (either two matrices
+representing 2d pixelized images, or two long data frames with columns
+"lon", "lat", and "val"). The data does not need to be normalized. "omd"
+stands for Ocean Mover's Distance.
 }

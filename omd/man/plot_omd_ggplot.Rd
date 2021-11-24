@@ -2,8 +2,7 @@
 % Please edit documentation in R/plot.R
 \name{plot_omd_ggplot}
 \alias{plot_omd_ggplot}
-\title{ggplot-based plotting of the optimal transport. Produces three figures: (1)
-The "before" image, (2) the "after" image, and (3) the optimal transports.}
+\title{ggplot-based plotting of the optimal transport.}
 \usage{
 plot_omd_ggplot(
   obj,
@@ -20,9 +19,28 @@ plot_omd_ggplot(
 )
 }
 \arguments{
-\item{obj}{An omd object.}
+\item{obj}{An "omd" class object.}
+
+\item{plot_type}{One or four plots.}
+
+\item{add_map}{If \code{TRUE}, add a map of the coastline.}
+
+\item{classify_quantile}{If \code{TRUE}, classify into blue and red arrows;
+otherwise just use blue arrows whose thickness.}
+
+\item{sample_arrows}{If \code{TRUE}, only plot half of the arrows.}
+
+\item{map_projection}{If \code{TRUE}, project onto the "globe", so the plot
+appears curved.}
+
+\item{map_orientation}{Orientation to input to \code{coord_map()} from
+\code{dplyr}. \url{https://ggplot2.tidyverse.org/reference/coord_map.html}}
+
+\item{return_arrows}{If \code{TRUE}, return a table containing information
+about arrows.}
+
+\item{arrow_range}{Range of arrow thicknesses.}
 }
 \description{
-ggplot-based plotting of the optimal transport. Produces three figures: (1)
-The "before" image, (2) the "after" image, and (3) the optimal transports.
+ggplot-based plotting of the optimal transport.
 }

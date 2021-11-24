@@ -1,0 +1,813 @@
+---
+title: "Application of OMD in comparing the depth profiles using the data from the HOT study to the Darwin model"
+author: "Aditya Mishra"
+output:
+  html_document: default
+  #pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(fig.width = 10, fig.height=5, echo=TRUE, warning=FALSE,
+                      message=FALSE, eval=TRUE, cache=FALSE)
+# load packages
+# devtools::install_github("sangwon-hyun/omd", subdir = "omd")
+library(latticeExtra)  
+library(Matrix) 
+library(transport)
+# library(omd)
+library(raster) 
+library(parallel)
+library(cmap4r)
+library(dplyr)
+library(ggplot2)
+set_authorization(cmap_key = "31095550-d3d9-11e9-9174-fdf4e45bb057")
+for (i in list.files('omd/R', full.names = T)) source(i)
+compute_avgomd = function(tem1, tem2){
+    tem_val = 0
+    ctr <- 0
+    for (i in 1:nrow(tem1)) {
+      for (j  in 1:nrow(tem2)) {
+        s_ind <- !is.na(tem1[i,] + tem2[j,])
+        if (any(s_ind)){
+          ctr = ctr + 1
+          temx1 <- data.frame(lat = as.numeric(names(tem1)[s_ind]), lon = 1,
+                      val = as.numeric(tem1[i,s_ind]))
+          temx2 <- data.frame(lat = as.numeric(names(tem2)[s_ind]), lon = 1,
+                      val = as.numeric(tem2[j,s_ind]))
+          temx1$val <- temx1$val/sum(temx1$val)
+          temx2$val <- temx2$val/sum(temx2$val)
+          
+          tem_val = tem_val + omd(temx1,temx2,M1_long = temx1,M2_long = temx2,
+                                type = "transport")$dist
+        }
+
+      }
+    }
+    return( tem_val/ctr)
+}
+# (1) colocalize HOT data, (2) make some joint visualizations of Darwin and Real data. Will you have time for this?
+```
+
+
+
+## Chlorophyll data from HOT study and  Darwin model
+We consider the data from the CTD Hydrography Hawaii Ocean time series (HOT) study to demonstrate the efficacy of OMD in data comparison. The research collected 28583 observations from Station ALOHA (a representative of the North Pacific situated at 22.75 degrees latitude and -158 degrees longitude) between 1988-10-3 to 2016-11-27 in the ocean depth range of 0 to 200 meters. All the data from the study is hosted on the CMAP database. Using OMD, we aim to compare the **Chloropigment (a measure of chlorophyll)** data from the HOT (in-situ) to the chlorophyll data from the Darwin model (forward model). Ideally, we expect the two data sets to have the same geographical location and time; however, it may not be possible due to experimental constraints. Hence, for each spatial site and time instances from the HOT study, we download and aggregate the Darwin model data in a chosen window of space and time because of better spatial resolution. We refer to this preprocessing procedure as **colocalization**.
+
+
+
+```{r}
+set_authorization(cmap_key = "31095550-d3d9-11e9-9174-fdf4e45bb057")
+## Extract chlorophyll concentration data from HOT
+tableName = 'tblHOT_CTD'
+sample <- get_head(tableName, nrows = 5)
+#sample
+varName <- "chloropigment_ctd_hot"
+range_var <- get_var_coverage(tableName, varName)
+# range_var
+# get_count(tableName)
+## Download HOT data from the CMAP database 
+# df_chl <- get_spacetime(tableName = tableName,
+#                                 varName = varName,
+#                                 dt1 = as.character(range_var[['Time_Min']]),
+#                                 dt2 = as.character(range_var[['Time_Max']]),
+#                                 lat1 = range_var[['Lat_Min']],
+#                                 lat2 = range_var[['Lat_Max']],
+#                                 lon1 = range_var[['Lon_Min']],
+#                                 lon2 = range_var[['Lon_Max']],
+#                                 depth1 = range_var[['Depth_Min']],
+#                                 depth2 = range_var[['Depth_Max']])
+# save(df_chl, file = 'HOT_chl.rdata')
+load('HOT_chl.rdata')
+#df_chl %>% dplyr::select(lat,lon) %>% distinct()
+#plot_track(tableName)
+```
+
+
+
+#### Colocalization of Darwin model data to HOT data
+In the CMAP database, the Darwin model data and HOT data are available in the **tblDarwin_Ecosystem** and **tblHOT_CTD** table, respectively. We noted a mismatch in the time range of two sets of data.
+
++ HOT data time range: **[1988-10-31	to 2016-11-27]**
++ Darwin data time range: **[1993-12-31 to 2015-12-30]**
++ Selected time range: **[1993-12-31 to 2015-12-30]**
+
+Hence, we have selected an intersection of time range for further analysis. In addition, the analysis noted that the Darwin model provides data at 17 distinct depth in the range of 0 to 200 meters. 
+
++ 5, 15, 25, 35, 45, 55, 65, 75, 85, 95.1, 105, 116, 127, 140, 154, 172, 195
+
+To download the chlorophyll data from the Darwin model using colocalization, we suggest using the following tolerance values for creating a window of spatiotemporal ranges. 
+
++ Depth window tolerance: 5 
++ Time window tolerance: 2 (days)
++ latitude and longitude window tolerance: 0.5 (degree)
+
+
+
+```{r, warning=FALSE}
+depth_time <- df_chl %>% dplyr::select(lat,lon, time, depth) %>% distinct() 
+lat = depth_time$lat[1];lon = depth_time$lon[1]
+depth_val = sort(unique(depth_time$depth))
+
+table_darwin <- 'tblDarwin_Ecosystem'   ## every three days data 
+sample <- get_head(table_darwin, nrows = 500)
+# See sample data 
+var_darwin <- 'CHL'
+
+temp <- outer(depth_val, unique(sample$depth[sample$depth <= 200]), "-")
+temp <- abs(temp)
+sel_depth <- apply(temp, 2, which.min)
+sel_index <- depth_val %in% depth_val[sel_depth]
+depth_val <- depth_val[sel_index]  # select HOT time_series data depth
+
+coverage <- get_var_coverage(table_darwin, var_darwin)
+
+time_min = max(min(depth_time$time),coverage$Time_Min); 
+time_max = min(max(depth_time$time),coverage$Time_Max) ; 
+
+# get_count(table_darwin, lat, lat, lon, lon, as.character(time_min),
+#           as.character(time_max), depth_val[1], tail(depth_val,1))
+
+```
+
+
+
+```{r}
+dep_tol = 5; time_tol = 2 # days 
+ll_tol = 0.5; 
+time_val <- with(depth_time, time[(time >= time_min)  & (time <= time_max )])
+time_val <- sort(unique(time_val))
+# out <- sample[1,c(1:4,8)]
+# out[1,] = NA
+# for (i in 1:length(time_val)) {
+#   cat(i)
+#   for (j in depth_val) { # i = 1; j = 10
+#     # i = depth_time$time[50];
+#     # j = depth_val[25]
+#     t_min <- as.character(as.Date(time_val[i]) - time_tol)
+#     t_max <- as.character(as.Date(time_val[i]) + time_tol)
+#     df_temp <- get_spacetime(tableName = table_darwin,
+#                                 varName = var_darwin,
+#                                 dt1 = t_min,
+#                                 dt2 = t_max,
+#                                 lat1 = lat- ll_tol,
+#                                 lat2 = lat + ll_tol,
+#                                 lon1 = lon - ll_tol,
+#                                 lon2 = lon + ll_tol,
+#                                 depth1 = j - dep_tol,
+#                                 depth2 = j + dep_tol)
+#     out = out %>% add_row(time = time_val[i], lat = lat, 
+#                           lon = lon, depth = j, 
+#                           CHL = mean(df_temp[[var_darwin]]))
+#   }
+# }
+# out <-  a[-1,]
+# save(out, file = 'darwin_chl.rdata')
+load('darwin_chl.rdata')
+head(out, 20)
+```
+
+## Model data comparison
+We highlight the effectiveness of OMD in the data comparison using various analysis plots and numerical measures. 
+
+
+#### Observation Levelplot 
+
+```{r, fig.height = 10, fig.width = 25, message= FALSE, warning= FALSE}
+# Jointly visualize the data
+joint_data <- left_join(out, df_chl)
+names(joint_data)[5:6] <- c('Model','HOT')
+# all(dim(joint_data)[1] == dim(out)[1]) # sanity check 
+# joint_data
+
+# Darwin data 
+darwin_chl <- joint_data %>%dplyr::select(time, depth, Model) %>% 
+  tidyr::spread(depth, Model)
+# head(darwin_chl, 10)
+
+# Observation from HOT
+hot_chl <- joint_data %>%dplyr::select(time, depth, HOT) %>% 
+  tidyr::spread(depth, HOT)
+#head(hot_chl, 10)
+
+
+pl_data <- tidyr::gather(joint_data,key = 'type', value = 'value',  -(1:4))
+pl_data <- pl_data %>% group_by(time, type) %>% mutate(normalize = value/sum(value))
+
+every_nth = function(n) {
+  return(function(x) {x[c(TRUE, rep(FALSE, n - 1))]})
+}
+ggplot(pl_data, aes(as.factor(time), as.factor(depth), fill= normalize)) +
+  facet_grid(~type) + 
+  geom_raster(alpha = 0.8, interpolate = T, na.rm = F, hjust = 0, vjust = 0) + 
+  scale_fill_gradientn(name = 'CHL', colours = heat.colors(200), na.value = "white") + 
+  theme_bw() + xlab("Time") + ylab('Depth') + 
+  scale_x_discrete(breaks = every_nth(n = 20)) + 
+  # labs(colour = "CHL") +
+  theme(axis.text.y = element_text(face = 'bold', size = 25),
+        axis.text.x = element_text(face = 'bold', size = 25, angle = 90),
+        axis.title = element_text(face = 'bold', size = 30),
+        strip.text = element_text(face = 'bold', size = 30),
+        legend.text = element_text(face = 'bold', size = 30),
+        legend.title = element_text(face = 'bold', size = 30),
+        legend.key.height = unit(7, 'cm'))
+
+```
+```{r, fig.height = 10, fig.width = 25, message= FALSE, warning= FALSE}
+ggplot(pl_data, aes(time, as.factor(depth), fill= normalize)) +
+  facet_grid(~type) + 
+  geom_raster(alpha = 0.8, interpolate = T, na.rm = F, hjust = 0, vjust = 0) + 
+  scale_fill_gradientn(name = 'CHL', colours = heat.colors(200), na.value = "white") + 
+  theme_bw() + xlab("Time") + ylab('Depth') + 
+  #scale_x_continuous(breaks = every_nth(n = 20)) + 
+  # labs(colour = "CHL") +
+  theme(axis.text.y = element_text(face = 'bold', size = 25),
+        axis.text.x = element_text(face = 'bold', size = 25, angle = 90),
+        axis.title = element_text(face = 'bold', size = 30),
+        strip.text = element_text(face = 'bold', size = 30),
+        legend.text = element_text(face = 'bold', size = 30),
+        legend.title = element_text(face = 'bold', size = 30),
+        legend.key.height = unit(7, 'cm'))
+```
+
+
+
+#### Consecutive sample time gap 
+```{r, fig.height = 4, fig.width = 7, message= FALSE, warning= FALSE}
+plot(diff(darwin_chl[['time']]), ylab = 'Time gap between samples (in days)',
+     col = 'red', cex = 1.5, pch  = 20, cex.axis = 1.50, cex.lab = 1.5)
+```
+
+
+
+
+
+
+#### Distribution comparison 
+After preprocessing, we have data across 226 distinct time points in the selected range of time. We compare the observed vs model data at  10 randomly chosen time points. The density plots below compare the distribution before and after normalizing the data :
+
++ Density plot after normalization
++ Density plot before normalization
+
+```{r, fig.height = 20, fig.width = 20, message= FALSE, warning= FALSE}
+n_time <- 20
+joint_data_temp <- joint_data %>% dplyr::select(time, depth, Model, HOT) %>% 
+  group_by(time) %>% mutate(Darwin_M = 100*Model/sum(Model), 
+                            HOT_O = 100*HOT/sum(HOT))
+
+
+## Comparison of the distribution after normalizing the data
+joint_data_temp2 <- joint_data_temp %>% dplyr::select(time, depth, Darwin_M, HOT_O)  %>% 
+  tidyr::gather('type','value', -c('time', 'depth' )) %>%
+    mutate(YearFct = forcats::fct_rev(as.factor(time)), 
+           type = forcats::fct_rev(as.factor(type))) 
+
+set.seed(123)
+df_plot <- joint_data_temp2[with(joint_data_temp2, time %in% base::sample(unique(time),n_time)), ]
+ggplot(df_plot, aes(x = depth, y = value)) +  #geom_point(aes(color = type)) + 
+geom_smooth(aes(color = type),method = stats::loess, formula = NULL, se = F) + 
+  ylab('Normalized value (%)') + 
+  facet_wrap(vars(YearFct)) +
+  theme_bw() + # scale_x_continuous(breaks=seq(0, 200, 100))  +
+    theme(axis.text = element_text(face = 'bold', color = 'blue', size = 25),
+        axis.title = element_text(face = 'bold', size = 30),
+        strip.text = element_text(face = 'bold', size = 30),
+        legend.text = element_text(face = 'bold', size = 30),
+        legend.title = element_text(face = 'bold', size = 30),
+        legend.position = 'top')
+
+
+## Comparison of the distribution without normalizing the data
+joint_data_temp2 <- joint_data_temp %>% dplyr::select(time, depth, Model, HOT)  %>% 
+  tidyr::gather('type','value', -c('time', 'depth' )) %>%
+    mutate(YearFct = forcats::fct_rev(as.factor(time)), 
+           type = forcats::fct_rev(as.factor(type))) 
+
+set.seed(123)
+df_plot <- joint_data_temp2[with(joint_data_temp2, time %in% base::sample(unique(time),n_time)), ]
+ggplot(df_plot, aes(x = depth, y = value)) +  #geom_point(aes(color = type)) + 
+geom_smooth(aes(color = type),method = stats::loess, formula = NULL, se = F) + 
+  ylab('Raw data') + 
+  facet_wrap(vars(YearFct)) +
+  theme_bw() + #scale_x_continuous(breaks=seq(0, 1, 0.2))  +
+    theme(axis.text = element_text(face = 'bold', color = 'blue', size = 25),
+        axis.title = element_text(face = 'bold', size = 30),
+        strip.text = element_text(face = 'bold', size = 30),
+        legend.text = element_text(face = 'bold', size = 30),
+        legend.title = element_text(face = 'bold', size = 30),
+        legend.position = 'top')
+```
+
+
+## Comparison of OMD with other distance measures 
+We demonstrate the effectiveness of OMD in modelling the DCM shift in the ocean compared to other distance measures such as Euclidean distance. 
+#### Compute OMD and other distance measure at each time point 
+```{r, message= FALSE, warning= FALSE,  fig.height = 10, fig.width = 20}
+## Comparison of the OMD for each time point 
+dt_darwin <- darwin_chl %>% tibble::column_to_rownames('time')
+dt_obs <- hot_chl %>% tibble::column_to_rownames('time')
+
+omd_comp <- NULL
+omd_transport = NULL
+tem_sel <- NULL
+for (i in 1:nrow(dt_darwin)) {
+  val1 <- dt_darwin %>% slice(i) %>% as.numeric()
+  val2 <- dt_obs %>% slice(i) %>% as.numeric()
+  
+  tem1 <- data.frame(#lat = 1:ncol(dt_darwin), 
+                     lat = as.numeric(names(dt_darwin)), 
+                     lon = 1, val = val1)
+  tem1$val <- tem1$val/sum(tem1$val)
+  
+  #tem1 <- dt_darwin[i,]
+  tem2 <- data.frame(#lat = 1:ncol(dt_darwin), 
+                     lat = as.numeric(names(dt_darwin)), 
+                     lon = 1, val = val2) 
+  tem2$val <- tem2$val/sum(tem2$val)
+  
+  
+  if(!is.na(sum(tem1$val)) & !is.na(sum(tem2$val)) ){
+    temp <- omd(tem1, tem2, M1_long = tem1,M2_long = tem2, type = "transport")
+    tem_sel <- c(tem_sel, rownames(dt_darwin)[i])   
+    omd_comp <- rbind(omd_comp, c( OMD = temp$dist, 
+                                  CORR = 1- cor(val1,val2), 
+                                  EUC =  norm(val1-val2, '2'),
+                                  DCMShift = abs(with(tem1, lat[which.max(val)]) - 
+                                                   with(tem2, lat[which.max(val)]))))
+    omd_transport <- rbind(omd_transport, 
+                           cbind(date = rownames(dt_darwin)[i], 
+                                 temp$transport_object))
+  }
+}
+## Print correlation statistics for comparing the measure type 
+print(cor(omd_comp))
+```
+
+#### DCM shift using OMD and other distance measures
+We demonstrate the effectiveness of OMD in modelling the DCM shift in the ocean compared to other distance measures such as Euclidean distance. Based on the **R-square** statistics, we conclude that OMD is better at learning DCM shift than the other distance measure.  
+
+
+
+```{r, message= FALSE, warning= FALSE,  fig.height = 8, fig.width = 12}
+## See the difference between different distance measure type
+df_plot <- data.frame(omd_comp)
+df_plot$Date <- as.Date(tem_sel)
+df_plot <- df_plot %>% tidyr::gather(key = 'D_type','D_value', -'Date',-'DCMShift')
+df_plot <- df_plot %>% group_by(D_type) %>% mutate(D_norm = D_value/max(abs(D_value), na.rm = T))
+#df_plot <- df_plot %>% tidyr::gather('type','val', -c('Date','D_type','DCMShift' ))
+df_plot$month <- months(df_plot$Date)
+df_plot$julian <- julian(df_plot$Date, origin = df_plot$Date[1] )
+# as_tibble(df_plot)
+Rsq_tag <- data.frame()
+for (i in c("OMD",'EUC')) {
+  temp <- df_plot %>% subset(D_type == i)
+  r.sq <- summary(lm(D_norm~DCMShift, temp))$r.squared
+  Rsq_tag <- rbind(Rsq_tag,c(i,paste('R2 = ',signif(r.sq,3)) ))
+  # print(c(i, signif(r.sq,3)))
+}
+names(Rsq_tag) <- c('D_type', 'label')
+# Rsq_tag
+formula <- y ~ x
+ggplot(data=df_plot %>% filter(D_type != "CORR"), aes(x=DCMShift, y=D_norm, color = D_type)) +
+  geom_smooth(method = 'lm', formula = formula) + 
+  facet_wrap(vars(D_type), scales = 'free') + 
+  geom_point(size = 3) + 
+  ylab("Normalized distance by maximum value")  + 
+  geom_text(data    = Rsq_tag, mapping = aes(x = 50, y = 1.1, label = label), size=10) + 
+  ggtitle("Effectiveness of OMD in capturing DCM-shift  in the ocean") +
+    theme_bw() +
+    theme(axis.text.x = element_text(face = 'bold', color = 'blue', size = 25, angle = 90),
+          axis.text.y = element_text(face = 'bold', color = 'blue', size = 25),
+          plot.title = element_text(hjust = 0.5, face = 'bold', size = 30),
+        axis.title = element_text(face = 'bold', size = 30),
+        strip.text = element_text(face = 'bold', size = 30),
+        legend.text = element_text(face = 'bold', size = 30),
+        legend.key.width = unit(5,"cm"),
+        legend.title = element_text(face = 'bold', size = 30),
+        legend.position = 'top')
+
+```
+
+
+
+
+#### Mass transfer based on OMD 
+While comparing the two distributions using OMD, the subroutine implementing the procedure also outputs the amount of mass exchanged. In our case, this is equivalent to finding the mass transferred from one location to another. A block in the mass-transfer heatmap shows the amount of mass transferred from one depth in the darwin data to another depth in the HOT data. We observed that the two sets of data mostly disagree in the depth range 96 m - 154 m. 
+
++ "From" (x-axis) signify Darwin model data
++ "To" (y-axis) signify HOT data
+
+```{r, message= FALSE, warning= FALSE,  fig.height = 5, fig.width = 6}
+temp <- aggregate(omd_transport, list(omd_transport$from, omd_transport$to), 
+          FUN = 'mean', na.rm = T)
+temp <- as_tibble(temp[,-3:-1])
+temp2 <- temp %>% tidyr::gather('type','val', -'mass')
+temp3 <- as.data.frame(tidyr::spread(temp, to, mass)[,-1])
+temp3[is.na(temp3)] <- 0
+rownames(temp3) <- colnames(temp3) <- colnames(dt_darwin)
+drawmat_precise(temp3, main="Mass transfer", scales=list(x=list(rot=90)), xlab = 'Darwin',  ylab = 'HOT', cex = 10, font = 3)
+```
+
+
+
+
+
+## Compare model vs observed data 
+
+
+### OMD aggregated by month 
+Our analysis considers data in the time range of **[1993-12-31 to 2015-12-30]**. HOT data were collected monthly but with irregular time gaps. For each month, we have several depth profiles. Hence, to compute the dissimilarity, we first calculate the OMD between all possible pairs of depth profiles for a given month pair and then average it.  We use OMD to perform monthly comparisons in four scenarios:
+
++ Darwin vs Darwin 
++ HOT vs HOT 
++ HOT vs Darwin 
++ Darwin vs HOT 
+
+The diagonal entries of the monthly comparison matrix using OMD are non-zero. Though the data is from the same month, their years may be different. 
+
+Aim of the analysis: 
++ Differentiate between the model and the observed data: MDS - 2D - color code 
++ Use 2-D representation MONTH (Darwin vs Darwin , HOT vs HOT) see if they agrees 
++ Finding cluster of months exhibiting similar depth profile
+
+```{r, fig.width = 20, fig.height=20, message= FALSE, warning= FALSE}
+
+obs_month <- months(as.Date(rownames(dt_darwin)))
+month_cat <- unique(obs_month)
+obs_obs <- dar_dar <- matrix(0,length(month_cat), length(month_cat))
+dar_obs <- obs_dar <- matrix(0,length(month_cat), length(month_cat))
+
+# for (mth_dar in 1:length(month_cat)) {
+#   print(mth_dar)
+#   for (mth_obs in 1:length(month_cat)) {
+#     #mth_dar = 1; mth_obs = 1
+#     dar_ind <- obs_month == month_cat[mth_dar]
+#     mth_ind <- obs_month == month_cat[mth_obs]
+#     dar_dar[mth_dar, mth_obs] <- compute_avgomd(dt_darwin[dar_ind,], dt_darwin[mth_ind,])
+#     obs_obs[mth_dar, mth_obs] <- compute_avgomd(dt_obs[dar_ind,], dt_obs[mth_ind,])
+#     dar_obs[mth_dar, mth_obs] <- compute_avgomd(dt_darwin[dar_ind,], dt_obs[mth_ind,])
+#     obs_dar[mth_dar, mth_obs] <- compute_avgomd(dt_obs[dar_ind,], dt_darwin[mth_ind,])
+#   }
+# }
+# ord_index <- match(month_cat,month.name)
+# dar_dar <- dar_dar[ord_index,ord_index]
+# obs_obs <- obs_obs[ord_index,ord_index]
+# dar_obs <- dar_obs[ord_index,ord_index]
+# obs_dar <- obs_dar[ord_index,ord_index]
+# rownames(dar_dar) <- colnames(dar_dar) <- month.abb
+# rownames(obs_obs) <- colnames(obs_obs) <- month.abb
+# rownames(dar_obs) <- colnames(dar_obs) <- month.abb
+# rownames(obs_dar) <- colnames(obs_dar) <- month.abb
+# OMD_mat = list(dar_dar = dar_dar, obs_obs = obs_obs,
+#                dar_obs= dar_obs, obs_dar = obs_dar)
+#save(OMD_mat, file = 'OMD_mat.rds')
+#load('OMD_mat.rds')
+# save(OMD_mat, file = 'OMD_mat_t.rds')
+load('OMD_mat_t.rds')
+
+# temp <- lapply(OMD_mat, function(x) {
+#   x <- x+t(x); diag(x) <- diag(x)/2; 
+#   x
+#   })
+temp2 <- lapply(OMD_mat, function(x) {
+  x <- x %>% as_tibble(); 
+  x$from <- colnames(x)
+  x <- tidyr::gather(x, key = 'to', value = 'OMD', -'from' )
+  x
+  })
+df_plot2 <- as_tibble()
+for (i in 1:length(temp2)){
+  x <- temp2[[i]]
+  temx <- strsplit(names(temp2)[i],'_')[[1]]
+  x$type1 <- temx[1]
+  x$type2 <- temx[2]
+  df_plot2 <- bind_rows(list(df_plot2, x))
+}
+
+df_plot2$from <- factor(df_plot2$from,levels = month.abb)
+df_plot2$to <- factor(df_plot2$to,levels = month.abb)
+df_plot2$type1 <- factor(df_plot2$type1)
+df_plot2$type2 <- factor(df_plot2$type2, levels = c('obs','dar') )
+levels(df_plot2$type1) <- c('Darwin Model', 'HOT')
+levels(df_plot2$type2) <- c('HOT', 'Darwin Model')
+# %>% filter(OMD !=0)
+ggplot(df_plot2 , aes(from, to, fill= OMD)) +
+  facet_grid(type2 ~ type1) + 
+  geom_tile()+
+  #geom_raster(alpha = 0.8, interpolate = T, na.rm = F, hjust = 0, vjust = 0) + 
+  scale_fill_gradientn(name = 'CHL', colours = heat.colors(200), na.value = "white") + 
+  theme_bw() + xlab("Months") + ylab('Months') + 
+  # scale_x_discrete(breaks = every_nth(n = 20)) + 
+  # labs(colour = "CHL") +
+  theme(axis.text.y = element_text(face = 'bold', size = 25),
+        axis.text.x = element_text(face = 'bold', size = 25, angle = 90),
+        axis.title = element_text(face = 'bold', size = 30),
+        strip.text = element_text(face = 'bold', size = 30),
+        legend.text = element_text(face = 'bold', size = 30),
+        legend.title = element_text(face = 'bold', size = 30),
+        legend.key.height = unit(7, 'cm'))
+
+```
+
+#### Multidimensional scaling
+Multidimensional scaling (MDS) based on the OMD allow us to project data in two dimensions. Based on the scatter plot, we tend to identify similar/dissimilar instances of observations. The analysis plot mentioned below suggest that the model data is different from the observations. 
+
++ Based on Darwin model data, following sets of month exhibiting similar depth profile: {Dec, Jan}, {Jul, Feb}, {Mar, Jun}, {Apr, May, Nov} and {Aug, Sep, Oct}. 
+
+```{r, fig.width = 4, fig.height=4, message= FALSE, warning= FALSE}
+
+df_plot3 <- df_plot2
+df_plot3$from <- paste(df_plot3$from, df_plot3$type1, sep = '-')
+df_plot3$to <- paste(df_plot3$to, df_plot3$type2, sep = '-')
+df_plot4 <- df_plot3 %>%dplyr::select(from, to, OMD) %>% 
+  tidyr::spread(to, OMD)
+
+## sanity check for order
+# names(df_plot4)[-1] == df_plot4[,1]
+
+dmat <- as.dist(df_plot4[,-1], diag = TRUE)
+fit <- cmdscale(dmat, eig=TRUE, k=2) # k is the number of dim
+x <- fit$points[,1]
+y <- fit$points[,2]
+pl_mds <- data.frame(x = x, y = y,  do.call(rbind, strsplit(names(x),'-')))
+names(pl_mds)[3:4] <- c('Month','Type')
+pl_mds$Month <- factor(pl_mds$Month,levels = month.abb)
+pl_mds$Type <- factor(pl_mds$Type,levels = c("Darwin Model","HOT"))
+
+ggplot(pl_mds, aes(x= x, y= y, colour=Type, label=Month))+
+  geom_point(size = 3) +geom_text(aes(label=Month),hjust=0, vjust=0) + 
+  # ggtitle("Multidimensional scaling plot with monthly averaged OMD") +
+    theme_bw() +
+    theme(axis.text.x = element_text(face = 'bold', color = 'blue', size = 20, angle = 90),
+          axis.text.y = element_text(face = 'bold', color = 'blue', size = 20),
+          plot.title = element_text(hjust = 0.5, face = 'bold', size = 15),
+        axis.title = element_text(face = 'bold', size = 15),
+        strip.text = element_text(face = 'bold', size = 15),
+        legend.text = element_text(face = 'bold', size = 15),
+        #legend.key.width = unit(5,"cm"),
+        legend.title = element_text(face = 'bold', size = 15),
+        legend.position = 'top')
+
+```
+#### Monthly dissimilarity
+Using the bar plot, we showcase the dissimilarity between the chlorophyll data from the Darwin model and HOT aggregated at the monthly level. 
+```{r,fig.width = 6, fig.height=4}
+pl_df <- df_plot2 %>% filter( (from == to) & (type1 != type2) ) %>% 
+  select_at(1:3) %>% slice(1:12)
+
+ggplot(data=pl_df, aes(x=from, y=OMD)) +
+  geom_bar(stat="identity", fill="steelblue")+
+  xlab('Month') + 
+    theme_bw() +
+    theme(axis.text.x = element_text(face = 'bold', color = 'blue', size = 20, angle = 90),
+          axis.text.y = element_text(face = 'bold', color = 'blue', size = 20),
+          plot.title = element_text(hjust = 0.5, face = 'bold', size = 15),
+        axis.title = element_text(face = 'bold', size = 15),
+        strip.text = element_text(face = 'bold', size = 15),
+        legend.text = element_text(face = 'bold', size = 15),
+        #legend.key.width = unit(5,"cm"),
+        legend.title = element_text(face = 'bold', size = 15),
+        legend.position = 'top')
+
+
+
+```
+
+
+
+### Dissimilary among depth profile using OMD 
+We compute the dissimilarity between all possible depth profiles obtained from the Darwin model and the HOT study in the selected time range We use OMD to perform comparisons in four scenarios:
+
++ Darwin vs Darwin 
++ HOT vs HOT 
++ HOT vs Darwin 
++ Darwin vs HOT 
+
+Aim of the analysis: 
++ Differentiate between the model and the observed data: MDS - 2D - color code 
++ Use 2-D representation MONTH (Darwin vs Darwin , HOT vs HOT) see if they agrees 
++ Finding cluster of months exhibiting similar depth profile
+
+
+```{r, fig.width = 20, fig.height=20}
+OMD_mat2 <- matrix(0,dim(dt_darwin)[1], dim(dt_darwin)[1])
+obs_obs2 <- dar_dar2 <- matrix(0,dim(dt_darwin)[1], dim(dt_darwin)[1])
+dar_obs2 <- obs_dar2 <-  matrix(0,dim(dt_darwin)[1], dim(dt_darwin)[1])
+# for (i in 1:dim(dt_darwin)[1]) {
+#   print(i)
+#   for (j in 1:dim(dt_darwin)[1]) {
+#     # i = 1; j=1
+#     tem1 <- data.frame(lat = as.numeric(names(dt_darwin)), lon = 1,
+#                      val = as.numeric(dt_darwin[i,]))
+#     tem1$val <- tem1$val/sum(tem1$val)
+#     #tem1 <- dt_darwin[i,]
+#     tem2 <- data.frame(lat = as.numeric(names(dt_darwin)), lon = 1,
+#                        val = as.numeric(dt_obs[j,]))
+#     tem2$val <- tem2$val/sum(tem2$val)
+#     if(!is.na(sum(tem1$val)) & !is.na(sum(tem2$val)) ){
+#       temp <- omd(tem1, tem2, M1_long = tem1,M2_long = tem2, type = "transport")
+#       dar_obs2[i,j] = temp$dist
+#     }
+#     
+#     ## ------
+#     tem1 <- data.frame(lat = as.numeric(names(dt_darwin)), lon = 1,
+#                      val = as.numeric(dt_obs[i,]))
+#     tem1$val <- tem1$val/sum(tem1$val)
+#     #tem1 <- dt_darwin[i,]
+#     tem2 <- data.frame(lat = as.numeric(names(dt_darwin)), lon = 1,
+#                        val = as.numeric(dt_darwin[j,]))
+#     tem2$val <- tem2$val/sum(tem2$val)
+#     if(!is.na(sum(tem1$val)) & !is.na(sum(tem2$val)) ){
+#       temp <- omd(tem1, tem2, M1_long = tem1,M2_long = tem2, type = "transport")
+#       obs_dar2[i,j] = temp$dist
+#     }
+#     
+#     ## ------
+#     tem1 <- data.frame(lat = as.numeric(names(dt_darwin)), lon = 1,
+#                      val = as.numeric(dt_obs[i,]))
+#     tem1$val <- tem1$val/sum(tem1$val)
+#     #tem1 <- dt_darwin[i,]
+#     tem2 <- data.frame(lat = as.numeric(names(dt_darwin)), lon = 1,
+#                        val = as.numeric(dt_obs[j,]))
+#     tem2$val <- tem2$val/sum(tem2$val)
+#     if(!is.na(sum(tem1$val)) & !is.na(sum(tem2$val)) ){
+#       temp <- omd(tem1, tem2, M1_long = tem1,M2_long = tem2, type = "transport")
+#       obs_obs2[i,j] = temp$dist
+#     }
+#     
+#     ## ------
+#     tem1 <- data.frame(lat = as.numeric(names(dt_darwin)), lon = 1,
+#                      val = as.numeric(dt_darwin[i,]))
+#     tem1$val <- tem1$val/sum(tem1$val)
+#     #tem1 <- dt_darwin[i,]
+#     tem2 <- data.frame(lat = as.numeric(names(dt_darwin)), lon = 1,
+#                        val = as.numeric(dt_darwin[j,]))
+#     tem2$val <- tem2$val/sum(tem2$val)
+#     if(!is.na(sum(tem1$val)) & !is.na(sum(tem2$val)) ){
+#       temp <- omd(tem1, tem2, M1_long = tem1,M2_long = tem2, type = "transport")
+#       dar_dar2[i,j] = temp$dist
+#     }
+#   }
+# }
+# 
+# rownames(obs_obs2) <- colnames(obs_obs2) <- rownames(dt_darwin)
+# rownames(dar_dar2) <- colnames(dar_dar2) <- rownames(dt_darwin)
+# rownames(dar_obs2) <- colnames(dar_obs2) <- rownames(dt_darwin)
+# rownames(obs_dar2) <- colnames(obs_dar2) <- rownames(dt_darwin)
+# OMD_mat = list(dar_dar = dar_dar2, obs_obs = obs_obs2,
+#                dar_obs= dar_obs2, obs_dar = obs_dar2)
+# save(OMD_mat, file = 'OMD_mat2.rds')
+load('OMD_mat2.rds')
+
+
+
+temp2 <- lapply(OMD_mat, function(x) {
+  x <- x %>% as_tibble(); 
+  x$from <- colnames(x)
+  x <- tidyr::gather(x, key = 'to', value = 'OMD', -'from' )
+  x
+  })
+df_plot2 <- as_tibble()
+for (i in 1:length(temp2)){
+  x <- temp2[[i]]
+  temx <- strsplit(names(temp2)[i],'_')[[1]]
+  x$type1 <- temx[1]
+  x$type2 <- temx[2]
+  df_plot2 <- bind_rows(list(df_plot2, x))
+}
+
+
+
+df_plot2$type1 <- factor(df_plot2$type1)
+df_plot2$type2 <- factor(df_plot2$type2, levels = c('obs','dar') )
+levels(df_plot2$type1) <- c('Darwin Model', 'HOT')
+levels(df_plot2$type2) <- c('HOT', 'Darwin Model')
+df_plot2$from <- factor(as.Date(df_plot2$from))
+df_plot2$to <-  factor(as.Date(df_plot2$to))
+
+# df_plot2$type <- paste(df_plot2$type1, df_plot2$type2, sep = "_")
+# %>% filter(OMD !=0)
+ggplot(df_plot2 , aes(from, to, fill= OMD)) +
+  facet_grid(type2 ~ type1) + 
+  geom_tile()+
+  #geom_raster(alpha = 0.8, interpolate = T, na.rm = F, hjust = 0, vjust = 0) + 
+  scale_fill_gradientn(name = 'CHL', colours = heat.colors(200), na.value = "white") + 
+  theme_bw() + xlab("Date") + ylab('Date') + 
+  scale_x_discrete(breaks = every_nth(n = 30)) + 
+  scale_y_discrete(breaks = every_nth(n = 30)) + 
+  # labs(colour = "CHL") +
+  theme(axis.text.y = element_text(face = 'bold', size = 35),
+        axis.text.x = element_text(face = 'bold', size = 35, angle = 90),
+        axis.title = element_text(face = 'bold', size = 50),
+        strip.text = element_text(face = 'bold', size = 40),
+        legend.text = element_text(face = 'bold', size = 40),
+        legend.position = "top",
+        legend.title = element_text(face = 'bold', size = 40),
+        legend.key.width = unit(9, 'cm'))
+```
+
+#### Multidimensional scaling
+Multidimensional scaling (MDS) based on the OMD allow us to project data in two dimensions. Based on the scatter plot, we tend to identify similar/dissimilar instances of observations. The analysis plot mentioned below suggest that the model data is different from the observations. 
+
+
+
+
+```{r, fig.width = 10, fig.height=8, message= FALSE, warning= FALSE}
+
+df_plot3 <- df_plot2
+df_plot3$from <- paste(df_plot3$from, df_plot3$type1, sep = '_')
+df_plot3$to <- paste(df_plot3$to, df_plot3$type2, sep = '_')
+df_plot4 <- df_plot3 %>%dplyr::select(from, to, OMD) %>% 
+  tidyr::spread(to, OMD)
+
+dmat <- as.dist(df_plot4[,-1], diag = TRUE)
+fit <- cmdscale(dmat, eig=TRUE, k=2) # k is the number of dim
+x <- fit$points[,1]
+y <- fit$points[,2]
+pl_mds <- data.frame(x = x, y = y,  do.call(rbind, strsplit(names(x),'_')))
+names(pl_mds)[3:4] <- c('Date','Type')
+pl_mds$Date <- as.Date(pl_mds$Date)
+pl_mds$Month <- factor(months(pl_mds$Date,abbreviate = T),levels = month.abb)
+pl_mds$Year <- factor(lubridate::year(pl_mds$Date))
+pl_mds$Type <- factor(pl_mds$Type,levels = c('Darwin Model','HOT'))
+
+ggplot(pl_mds, aes(x= x, y= y, colour=Type, label=Month))+
+  geom_point( size = 2) + #geom_text(aes(label=Month),hjust=0, vjust=0) + 
+  # ggtitle("Multidimensional scaling plot for comparison") +
+    theme_bw() +
+    theme(axis.text.x = element_text(face = 'bold', color = 'blue', size = 25, angle = 90),
+          axis.text.y = element_text(face = 'bold', color = 'blue', size = 25),
+          plot.title = element_text(hjust = 0.5, face = 'bold', size = 15),
+        axis.title = element_text(face = 'bold', size = 15),
+        strip.text = element_text(face = 'bold', size = 15),
+        legend.text = element_text(face = 'bold', size = 15),
+        #legend.key.width = unit(5,"cm"),
+        legend.title = element_text(face = 'bold', size = 15),
+        legend.position = 'top')
+
+```
+
+We segment the representation by years, color code by data type and annotate by the month text. 
+
++ In a given year, the plot should bring together months with similar depth profiles together. 
+
+```{r, fig.width = 20, fig.height=10, message= FALSE, warning= FALSE}
+## loop by year and month 
+## Observe the pattern 
+yr <- levels(pl_mds$Year)
+pl <- vector('list', length(yr))
+
+for (i in 1:length(yr)) {
+  # i = 1
+  pl_mds2 <- pl_mds %>% as_tibble() %>% filter(Year == yr[i]) 
+  pl[[i]] <- ggplot(pl_mds2, aes(x= x, y= y, colour=Type,label=Month)) +
+  geom_point(size = 3) + geom_text(aes(label=Month),hjust=0, vjust=0, size=8, , show_guide = F) + 
+  ggtitle(yr[i]) +
+    theme_bw() +
+    theme(axis.text.x = element_text(face = 'bold', color = 'blue', size = 20, angle = 90),
+          axis.text.y = element_text(face = 'bold', color = 'blue', size = 20),
+          plot.title = element_text(hjust = 0.5, face = 'bold', size = 20),
+        axis.title = element_text(face = 'bold', size = 20),
+        strip.text = element_text(face = 'bold', size = 20),
+        legend.text = element_text(face = 'bold', size = 20),
+        #legend.key.width = unit(5,"cm"),
+        legend.title = element_text(face = 'bold', size = 20),
+        legend.position = 'top')
+}
+
+
+library(gridExtra)
+do.call("grid.arrange", c(pl[1:2], ncol=2))
+
+```
+
+## Learning seasonality 
+We plot the degree of dissimilarity between depth profiles of the Darwin model and HOT analysis as a function of time. Year and days are used to express the time gap.  We ignore the calendar year information when calculating days between samples. 
+
+```{r, fig.width = 10, fig.height=10, message= FALSE, warning= FALSE}
+temp <- df_plot2 %>% mutate(from = as.Date(from), to = as.Date(to)) %>% 
+  filter(type1 == type2 ) %>% filter( from < to) %>% 
+  mutate(Time_gap = to - from ) %>% 
+  mutate(Years = as.numeric(Time_gap)/365, Days = as.numeric(Time_gap) %% 365)
+
+pl_data <- temp %>% select(c(OMD, type1, Years,  Days)) %>% 
+  tidyr::gather('GapType','Value', -c(OMD,type1))
+
+
+
+ggplot(pl_data, aes(x = Value, y = OMD)) +  geom_point() + 
+geom_smooth(method = stats::loess, formula = NULL, se = F) + 
+  ylab('OMD') + 
+  facet_grid(type1~GapType, scales = 'free_x') +
+  theme_bw() + #scale_x_continuous(breaks=seq(0, 1, 0.2))  +
+    theme(axis.text = element_text(face = 'bold', color = 'blue', size = 25),
+        axis.title = element_text(face = 'bold', size = 30),
+        strip.text = element_text(face = 'bold', size = 30),
+        legend.text = element_text(face = 'bold', size = 30),
+        legend.title = element_text(face = 'bold', size = 30),
+        legend.position = 'top')
+
+
+
+```
+
+

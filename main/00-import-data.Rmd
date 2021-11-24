@@ -2,27 +2,26 @@
 title: Importing data
 date: "Compiled at `r format(Sys.time(), '%Y-%m-%d %H:%M:%S', tz = 'UTC')` UTC"
 output: 
-  html_document:
-    code_folding: hide
-    toc: true
-    toc_float: true
   github_document: default
 ---
 
-```{r global_options, include=TRUE}
+```{r global_options, include=TRUE, message = FALSE}
 knitr::opts_chunk$set(fig.width=14, fig.height=8, echo=TRUE, eval=TRUE, cache=FALSE,
                       warning=FALSE, message=FALSE,
                       cache.lazy = FALSE)
 
 ## Load packages
-library(tidyverse)
-library(knitr)
-library(here)
-library(ggplot2)
-library(tidync)
+library(tidyverse, quietly = TRUE)
+library(knitr, quietly = TRUE)
+library(here, quietly = TRUE)
+library(ggplot2, quietly = TRUE)
+library(tidync, quietly = TRUE)
+library(omd, quietly = TRUE)
 source("00-helpers.R")
-load_all("~/repos/omd/omd") ## Location of OMD R package; replace with library(omd) soon.
 ```
+
+The R package `omd` to use is here [https://github.com/sangwon-hyun/omd/](https://github.com/sangwon-hyun/omd/), commit number ()[].
+
  
 ```{r directories}
 base = "00-import-data"
@@ -34,22 +33,22 @@ if(!dir.exists(datadir)) dir.create(datadir)
 ```
 
 There are three datasets for this project, all placed here
-[](/data/00-import-data).
+[/data/00-import-data](/data/00-import-data).
 
 * Climatology data, from [github](https://github.com/brorfred/ocean_clustering).
 
 * Non-climatology data, from [netcdf files in a web server directory](https://rsg.pml.ac.uk/shared_files/brj/proj/CBIOMES/Justin/).
 
-* Depth data, downloaded from CMAP (not done yet):
+* Depth data, downloaded from CMAP. See [./depth-analysis-as-is](./depth-analysis-as-is).
 
 
-# Climatology data
+## Climatology data
 
 The **climatology** chlorophyll dataset is a monthly dataset having averaged 20
 years worth of data for each month (January through December).
 
-There are multiple resolutions of this data; we mainly make use of the 1-degree
-resolution data.
+There are multiple resolutions of this data; we mainly make use of the 2-degree
+resolution data. Here is some sample code for loading this.
 
 ```{r climatology}
 ## Read in data
@@ -68,21 +67,20 @@ print(rdat)
 print(ddat)
 ```
 
-TODO: add a simple plot here (pipe out from `rdat`).
-
-# Non-climatology data
+## Non-climatology data
 
 Non-climatology dataset was compiled by Bror Johnsson and shared as netcdf
-(`.nc`) files. This data was further cleaned (code shown furtherbelow) and saved
+(`.nc`) files. This data was further cleaned (code shown further below) and saved
 as RDS files containing data frames between 1998 through 2001. These RDS files
 are named like this:
 
 `filename = paste0(type, "-nonclim-", year, "-", mo, ".RDS")`
 
 where `type` is one of "darwin" or "real" (meaning remote sensing), and `year`
-is one of {1998, 1999, 2000, 2001}, and `mo` is month number 1, ..., 12.
+is one of {1998, 1999, 2000, ..,  2006}, and `mo` is month number 1, ..., 12. Here's
+an example of one month's data:
 
-```{r nonclimatology, fig.width = 5, fig.height = 5}
+```{r nonclimatology, fig.width = 6, fig.height = 6, eval = FALSE}
 type = "real"
 year = 2000
 mo = 6
@@ -97,8 +95,8 @@ one_month_dat %>%
   theme(plot.title = element_text(size = rel(2), face = "bold"))
 ```
 
-This data files (named e.g. `darwin-nonclim-2000-1.RDS`) were cleaned and
-produced using this code (not run now):
+These data files (named e.g. `data/darwin-nonclim/darwin-nonclim-2000-1.RDS`)
+were cleaned and produced using this code (not run now):
 
 ```{r clean-nonclim, eval=FALSE}
 ## Latitude/longitude range 
@@ -209,14 +207,3 @@ for(dat_type in c("darwin", "real")){
 }
 ```
 
-
-# Depth data
-
-The depth dataset has been downloaded from Simon's CMAP, from the tables "" and
-"". Here is the code to do compile this data.
-
-```{r}
-```
-
-
-# 

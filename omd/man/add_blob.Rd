@@ -2,7 +2,7 @@
 % Please edit documentation in R/plot.R
 \name{add_blob}
 \alias{add_blob}
-\title{Add blob.}
+\title{helper to add patch (blob) to existing plot.}
 \usage{
 add_blob(longdat, center = c(-150, 15), sigma = NULL, fac = 60, rotate = 0)
 }
@@ -10,10 +10,16 @@ add_blob(longdat, center = c(-150, 15), sigma = NULL, fac = 60, rotate = 0)
 \item{longdat}{Data.}
 
 \item{center}{lon, lat of center of the blob.}
+
+\item{sigma}{Covariance of Gaussian blob.}
+
+\item{fac}{How strong should this blob be.}
+
+\item{rotate}{how much to rotate the blob.}
 }
 \value{
-abc
+The resulting long dataset.
 }
 \description{
-Add blob.
+helper to add patch (blob) to existing plot.
 }

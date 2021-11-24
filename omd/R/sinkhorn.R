@@ -6,13 +6,14 @@
 ##' @param invec Input vector (size m)
 ##' @param outvec Output vector (size n)
 ##' @param eps Tolerance for stopping the algorithm, in terms of row sums of P.
+##' @param rel_eps Relative tolerance.
 ##' @param verbose Set to \code{TRUE} if you want loud code. Defaults to \code{TRUE}
 ##'
 ##' @importFrom magrittr "%>%"
 ##'
-##' @return List containing three things; `dist`, the sinkhorn distance, `costm`
-##'   the original cost matrix, `transports` is an (m x n) matrix of the optimal
-##'   (regularized) transports.
+##' @return List containing three things; \code{dist}, the sinkhorn distance,
+##'   \code{costm} the original cost matrix, \code{transports} is an (m x n)
+##'   matrix of the optimal (regularized) transports.
 ##'
 ##' @export
 sinkhorn <- function(costm, lambda, invec, outvec,

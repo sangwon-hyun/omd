@@ -2,10 +2,13 @@
 % Please edit documentation in R/omd.R
 \name{print.omd}
 \alias{print.omd}
-\title{Print function for omd}
+\title{Print function for omd object.}
 \usage{
 print.omd(obj)
 }
+\arguments{
+\item{obj}{.}
+}
 \description{
-Print function for omd
+Print function for omd object.
 }

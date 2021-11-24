@@ -8,8 +8,8 @@ matrix of size (n x n).}
 form_cost_matrix(dat, geodesic = FALSE)
 }
 \arguments{
-\item{Matrix}{whose rows are data points, and columns are named "lat" and
-"lon".}
+\item{dat}{Matrix whose rows are data points, and columns are named "lat"
+and "lon".}
 }
 \value{
 p x p cost matrix.
