@@ -7,7 +7,7 @@ sources using Wasserstein distance, for the paper here:
 
 Here's an example of a comparison of two Chlorophyll maps from two sources
 #+ATTR_HTML: :style margin-left: auto; margin-right: auto;
-[[./climatology-transport-1.png]]
+[[./cover.png]]
 
 ** Usage
 The scripts named e.g. ~00-import-data.Rmd~ are to be run (knit) in order of the
