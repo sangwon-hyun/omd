@@ -1,4 +1,4 @@
-#+title: Analysis of Chlorophyll data using Wasserstein distance
+#+title: Optimal transport for analyzing oceanographic data
 #+author: Sangwon Hyun
 
 This directory contains the workflow for analyzing Chlorophyll data from various

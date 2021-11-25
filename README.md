@@ -1,8 +1,8 @@
-Analysis of Chlorophyll data using Wasserstein distance
+Optimal transport for analyzing oceanographic data
 =============
 
-This repository contains code for applying Wasserstein's distance for analyzing
-ocean data, for this paper:
+This repository contains code for applying optimal transport and Wasserstein's
+distance for analyzing ocean data, for this paper:
 [https://arxiv.org/abs/2111.08736](https://arxiv.org/abs/2111.08736). The main
 motivating application is that of Chlorophyll maps and distributions, over space
 and time.
