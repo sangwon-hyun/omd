@@ -1,11 +1,10 @@
 Lat/lon analysis of climatology Chlorophyll data
 ================
-Compiled at 2021-11-24 23:02:51 UTC
+Compiled at 2022-07-29 00:55:13 UTC
 
 ``` r
-knitr::opts_chunk$set(fig.width=14, fig.height=8, echo=TRUE, eval=TRUE, cache=FALSE,
-                      warning=FALSE, message=FALSE,
-                      cache.lazy = FALSE)
+knitr::opts_chunk$set(fig.width=14, fig.height=8, echo=TRUE, eval=TRUE, cache=TRUE,
+                      warning=FALSE, message=FALSE)
 
 ## Load packages
 library(tidyverse, quietly = TRUE)
@@ -18,19 +17,18 @@ library(ggstar, quietly = TRUE)
 library(omd, quietly = TRUE)
 ```
 
+    ## Warning: replacing previous import 'dplyr::union' by 'raster::union' when loading 'omd'
+
     ## Warning: replacing previous import 'dplyr::select' by 'raster::select' when loading 'omd'
 
     ## Warning: replacing previous import 'dplyr::intersect' by 'raster::intersect' when loading 'omd'
 
-    ## Warning: replacing previous import 'dplyr::union' by 'raster::union' when loading 'omd'
-
 ``` r
-source("01-helpers.R")
-figdir = "~/Dropbox/Apps/Overleaf/OMD/figures" 
+sf::sf_use_s2(FALSE)
 ```
 
 The R package `omd` to use is here
-<https://github.com/sangwon-hyun/omd/>, commit ()\[\].
+<https://github.com/sangwon-hyun/omd/>.
 
 ``` r
 base = "01-climatology"
@@ -39,6 +37,8 @@ knitr::opts_chunk$set(fig.path = here::here("data", base, 'figures/'))
 datadir = here::here("data", base)
 datadir_orig = here::here("data", "00-import-data")
 if(!dir.exists(datadir)) dir.create(datadir)
+source(here::here("01-helpers.R"))
+figdir = here::here("figures")
 ```
 
 Here’s the box we’ll focus on.
@@ -49,8 +49,8 @@ lon = -155.5828
 boxsize = 40
 lonrange = lon + c(-1,1) * boxsize
 latrange = lat + c(-1,1) * boxsize
-latrange = pmin(latrange, 48.25) 
-latrange = pmax(latrange, -20.5) 
+latrange = pmin(latrange, 48.25)
+latrange = pmax(latrange, -20.5)
 restrictbox <- . %>% filter(lat > latrange[1],
                             lat < latrange[2],
                             lon > lonrange[1],
@@ -102,6 +102,7 @@ alldat_list = alldat_list %>%
              complete_rectangle() %>%
              dplyr::arrange(lon, lat))
 
+
 ## Check that all lon, lats are exactly the same
 all_lonlats = alldat_list %>% purrr::map(. %>% dplyr::select(lon, lat))
 for(ii in 1:length(all_lonlats)){
@@ -125,7 +126,7 @@ twodat = combine(d1, d2, name1_long, name2_long)
 plot_dat(twodat, add_map = TRUE)
 ```
 
-![](/home/sangwonh/repos/omd/main/data/01-climatology/figures/calculate-omd-1.png)<!-- -->
+![](01-climatology_files/figure-gfm/calculate-omd-1.png)<!-- -->
 
 ``` r
 ## Calculate 1-Wasserstein
@@ -146,15 +147,17 @@ p1 = twodat %>% plot_dat(add_map = TRUE,
                          standardize = TRUE,
                          limits = limits,
                          colours = colours, legend_name = "Chlorophyll\n     PDF")
-p1 = p1 + theme(legend.position="left") +
-  theme(strip.text.x = element_text(size = rel(1.4))) 
+
+p1 = p1 + theme(legend.position="bottom") +
+  theme(strip.text.x = element_text(size = rel(1.4))) +
+  theme(legend.key.width = unit(2, "cm"))
 plot(p1)
 ```
 
-![](/home/sangwonh/repos/omd/main/data/01-climatology/figures/clim-two-maps-1.png)<!-- -->
+![](01-climatology_files/figure-gfm/clim-two-maps-1.png)<!-- -->
 
 ``` r
-## ggsave(file.path(figdir, "climatology-maps.pdf"), width = 10, height=5)
+## ggsave(file.path(figdir, "climatology-maps-new.pdf"), width = 12, height=6)
 ```
 
 Make plot of pixel-wise difference
@@ -169,19 +172,21 @@ dat3 = dat2
 dat3$val = dat1$val - dat2$val
 dat3$dat_type = "Pixel-wise difference"
 p2 = plot_dat(dat3, standardize = FALSE, add_map = TRUE) +
-  theme(legend.position="left") +
+  theme(legend.position="bottom") +
+  theme(legend.key.width = unit(1.5, "cm")) +
   theme(strip.text.x = element_text(size = rel(1.4))) +
   theme(legend.title=element_text(size=rel(1.2))) + 
   scale_fill_gradientn(colours = c("blue", "white", "red"),
                        limits = c(-0.003, 0.003),
-                       name = "Difference")
+                       name = "Difference",
+                       na.value = "white")
 plot(p2)
 ```
 
-![](/home/sangwonh/repos/omd/main/data/01-climatology/figures/clim-pixelwise-diff-1.png)<!-- -->
+![](01-climatology_files/figure-gfm/clim-pixelwise-diff-1.png)<!-- -->
 
 ``` r
-## ggsave(file.path(figdir, "climatology-diff.pdf"), width = 6, height=6)
+## ggsave(file.path(figdir, "climatology-diff-new.pdf"), width = 6, height=6)
 ```
 
 ``` r
@@ -196,10 +201,10 @@ p = p + theme(strip.text.x = element_text(size = rel(2.5)))
 plot(p)
 ```
 
-![](/home/sangwonh/repos/omd/main/data/01-climatology/figures/clim-transport-plot-1.png)<!-- -->
+![](01-climatology_files/figure-gfm/clim-transport-plot-1.png)<!-- -->
 
 ``` r
-## ggsave(file.path(figdir, "climatology-omd-mid.pdf"), width = 12, height=12)
+## ggsave(file.path(figdir, "climatology-omd-mid-new.pdf"), width = 12, height=12)
 ```
 
 ## Bottom row of Figure 2
@@ -209,7 +214,6 @@ Calculate distance matrix.
 ``` r
 distmat = matrix(NA, 24, 24)
 for(ii in 1:24){
-  printprogress(ii, 24)
   for(jj in 1:24){
     if(ii < jj){
 
@@ -226,7 +230,7 @@ for(ii in 1:24){
 } 
 diag(distmat) = NA
 colnames(distmat) = rownames(distmat) = names(alldat_list)
-saveRDS(distmat, file = file.path(datadir, "geo-distmat-clim-p2.RDS"))
+saveRDS(distmat, file = file.path(datadir, "geo-distmat-clim-p2-overreact.RDS"))
 ```
 
 Plot distance matrix.
@@ -241,24 +245,23 @@ p = p + theme(legend.position = "left")
 plot(p)
 ```
 
-![](/home/sangwonh/repos/omd/main/data/01-climatology/figures/distmat-plot-1.png)<!-- -->
+![](01-climatology_files/figure-gfm/distmat-plot-1.png)<!-- -->
 
 ``` r
 plotfilename = "distmat-climatology-overreact.pdf"
-ggsave(file.path(figdir, plotfilename), width = 6, height=6)
+## ggsave(file.path(figdir, plotfilename), width = 6, height=6)
 ```
 
 Plotting MDS plot.
 
 ``` r
 ## Load distance matrix
-outputdir = "~/repos/omd/main/data/04-cluster-boundary"
 distmat = readRDS(file = file.path(datadir, "geo-distmat-clim-p2-overreact.RDS"))
 p = make_mds_plot(distmat)
 plot(p)
 ```
 
-![](/home/sangwonh/repos/omd/main/data/01-climatology/figures/mds-plot-1.png)<!-- -->
+![](01-climatology_files/figure-gfm/mds-plot-1.png)<!-- -->
 
 ``` r
 ## ggsave(file = file.path(figdir, "mds-climatology-overreact.pdf"), width = 6, height = 5) 
@@ -291,31 +294,27 @@ mo = 1
 darwindat = ddat %>% dplyr::filter(month == mo) %>%  dplyr::select(month, lat, lon, val = Chl)  
 darwindat = darwindat %>% restrictbox()
 
+
 p1 = plot_dat(darwindat %>% 
-              add_blob(c(-150 + (10*0 ), -25),
+              add_blob(c(-150 + (10*0), -25),
                        rotate = 0),
               add_map = TRUE)
-
 p1 = p1 + labs(title = "Map 1")
 p1 = p1 + theme(plot.title = element_text(hjust = 0.5))
+plot(p1) 
+```
+
+![](01-climatology_files/figure-gfm/toy-map-1.png)<!-- -->
+
+``` r
 plot(p1)
 ```
 
-![](/home/sangwonh/repos/omd/main/data/01-climatology/figures/toy-map-1.png)<!-- -->
+![](01-climatology_files/figure-gfm/toy-map-2.png)<!-- -->
 
 ``` r
-## ggsave(file = file.path(figdir, "toy-map-orig-without-star.png"), width = 4, height=5)
-
-p1 = p1 + geom_star(aes(x=lon, y=lat), data = data.frame(lat = 22.45, lon = -158), size=5,
-                    fill = 'yellow', col = 'black') 
-plot(p1)
-```
-
-![](/home/sangwonh/repos/omd/main/data/01-climatology/figures/toy-map-2.png)<!-- -->
-
-``` r
-## ggsave(file = file.path(figdir, "toy-map-orig.png"), width = 4, height=5)
-
+## ggsave(file = file.path("~/Desktop", "toy-map-orig-new.png"), width = 5, height=5) ## temporary
+## ggsave(file = file.path(figdir, "toy-map-orig-without-star.png"), width = 3.5, height=5)
 
 p2 = plot_dat(darwindat %>%
               add_blob(c(-150 + (10*0 ), -25),
@@ -334,10 +333,10 @@ p2 = p2 + theme(plot.title = element_text(hjust = 0.5))
 plot(p2)
 ```
 
-![](/home/sangwonh/repos/omd/main/data/01-climatology/figures/toy-map-3.png)<!-- -->
+![](01-climatology_files/figure-gfm/toy-map-3.png)<!-- -->
 
 ``` r
-## ggsave(file = file.path(figdir, "toy-map.png"), width = 4, height=5)
+## ggsave(file = file.path(figdir, "toy-map-new.png"), width = 3.5, height=5) ## temporary
 ```
 
 Toy distances.
@@ -345,7 +344,6 @@ Toy distances.
 ``` r
 start.time = Sys.time()
 dists = mclapply(1:20, function(ii){
-  printprogress(ii, 20, start.time = start.time)
 
   dat1 = darwindat %>% add_blob(c(-150, -25))
   dat2 = darwindat %>% add_blob(c(-150 + 2*ii, -25), rotate = (ii / 20) * 90)
@@ -394,10 +392,10 @@ p = ggplot(distmat) +
 plot(p)
 ```
 
-![](/home/sangwonh/repos/omd/main/data/01-climatology/figures/toy-dists-1.png)<!-- -->
+![](01-climatology_files/figure-gfm/toy-dists-1.png)<!-- -->
 
 ``` r
 p = p + labs(title = "Comparing Map1 and Map2")
 p = p + theme(plot.title = element_text(hjust = 0.5))
-## ggsave(file = file.path(figdir, "toy-dists.png"), width = 4, height =5)
+## ggsave(file = file.path(figdir, "toy-dists-new.png"), width = 3.5, height =4.2)
 ```

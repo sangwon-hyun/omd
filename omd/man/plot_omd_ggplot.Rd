@@ -2,7 +2,8 @@
 % Please edit documentation in R/plot.R
 \name{plot_omd_ggplot}
 \alias{plot_omd_ggplot}
-\title{ggplot-based plotting of the optimal transport.}
+\title{ggplot-based plotting of the optimal transport pattern. \code{plot_dat()} is
+used for plotting data.}
 \usage{
 plot_omd_ggplot(
   obj,
@@ -42,5 +43,6 @@ about arrows.}
 \item{arrow_range}{Range of arrow thicknesses.}
 }
 \description{
-ggplot-based plotting of the optimal transport.
+ggplot-based plotting of the optimal transport pattern. \code{plot_dat()} is
+used for plotting data.
 }

@@ -1,4 +1,5 @@
-##' ggplot-based plotting of the optimal transport.
+##' ggplot-based plotting of the optimal transport pattern. \code{plot_dat()} is
+##' used for plotting data.
 ##'
 ##' @param obj An "omd" class object.
 ##' @param plot_type One or four plots.
@@ -148,6 +149,11 @@ plot_omd_ggplot <- function(obj, plot_type = c("one", "four"),
 
   p = p + theme(strip.text.x = element_text(size = rel(1.2)))
 
+
+
+
+  ## START of OLD ############
+  if(FALSE){
   ## Add map elements
   if(add_map){
     world <- rnaturalearth::ne_countries(scale = "medium", returnclass = "sp")
@@ -163,6 +169,38 @@ plot_omd_ggplot <- function(obj, plot_type = c("one", "four"),
                       orientation = map_orientation,
                       ylim = latrange, xlim = lonrange)
   }
+  }
+  ## END of OLD ##############
+
+  ## Get lat/lon range
+  latrange = obj$M1_long %>% pull(lat) %>% range()
+  lonrange = obj$M1_long %>% pull(lon) %>% range()
+
+  ## Add map elements
+  if(add_map){
+
+    ## Load world map (as sf object)
+    world <- rnaturalearth::ne_countries(scale = "medium", returnclass = "sp")
+    world_sf <- st_as_sf(world)
+
+    ## Clip the world map (sf object)
+    df = data.frame(lon = c(lonrange[1], lonrange[2] + 5, lonrange[2] +5, lonrange[1]),
+                    lat = c(latrange[1], latrange[1], latrange[2], latrange[2]))
+    clip_boundary <- sp::SpatialPolygons(list(sp::Polygons(list(sp::Polygon(df)), ID = 1)))
+    boundary_sf <- st_as_sf(clip_boundary)
+    world <- st_crop(world_sf, boundary_sf)
+    world = as(world, 'Spatial')
+
+    ## Add a layer to the map
+    p = p + geom_polygon(data = world,
+                         aes(x = long, y = lat, group = group),
+                         fill = "grey60", colour = "grey70")
+  }
+
+  if(map_projection){
+    p = p + coord_map("lambert", lat0 = 10, lat = 30,
+                      ylim = latrange, xlim = lonrange)
+  }
 
   return(p)
 }
@@ -172,7 +210,7 @@ plot_omd = plot_omd_ggplot
 
 
 
-##' Make a multi-panel plot of the data.
+##' (Simpler, easier projection) Make a multi-panel plot of the data.
 ##'
 ##' @param longdat A matrix with columns: \code{lat}, \code{lon},
 ##'   \code{val}. Optionally, \code{longdat} can have a column named
@@ -213,6 +251,10 @@ plot_dat <- function(longdat = NULL, mat = NULL, valname = NULL,
   if(!is.null(valname)) longdat = longdat %>% rename(!!valname := val)
 
 
+  ## Get the lat/lon range
+  if(is.null(latrange)) latrange = longdat %>% pull(lat) %>% range()
+  if(is.null(lonrange)) lonrange = longdat %>% pull(lon) %>% range()
+
   ## Colors setup
   if(is.null(colours)) colours = c("blue", "red", "yellow")
 
@@ -222,7 +264,7 @@ plot_dat <- function(longdat = NULL, mat = NULL, valname = NULL,
     ggplot() +
     facet_grid(.~dat_type)  +
     geom_tile(aes(x = lon, y = lat, fill = !!sym(valname))) +
-    scale_fill_gradientn(colours = colours, limits = limits, breaks = breaks, name = legend_name)+
+    scale_fill_gradientn(colours = colours, limits = limits, breaks = breaks, name = legend_name, na.value = "transparent") +
     theme_minimal() +
     ylab("Latitude") + xlab("Longitude") +
     coord_fixed(ratio = 1)
@@ -239,20 +281,28 @@ plot_dat <- function(longdat = NULL, mat = NULL, valname = NULL,
 
   ## Add map elements
   if(add_map){
+
+    ## Load world map (as sf object)
     world <- rnaturalearth::ne_countries(scale = "medium", returnclass = "sp")
+    world_sf <- st_as_sf(world)
+
+    ## Clip the world map (sf object)
+    df = data.frame(lon = c(lonrange[1], lonrange[2] + 5, lonrange[2] +5, lonrange[1]),
+                    lat = c(latrange[1], latrange[1], latrange[2], latrange[2]))
+    clip_boundary <- sp::SpatialPolygons(list(sp::Polygons(list(sp::Polygon(df)), ID = 1)))
+    boundary_sf <- st_as_sf(clip_boundary)
+    world <- st_crop(world_sf, boundary_sf)
+    world = as(world, 'Spatial')
+
+    ## Add a layer to the map
     p = p + geom_polygon(data = world,
                          aes(x = long, y = lat, group = group),
-                         fill = "white", colour = "grey70")
+                         fill = "grey60", colour = "grey70")
   }
 
   if(map_projection){
-    if(is.null(latrange)) latrange = longdat %>% pull(lat) %>% range()
-    if(is.null(lonrange)) lonrange = longdat %>% pull(lon) %>% range()
-    p = p + coord_map("azequalarea",
-                      orientation = map_orientation,##c(-36.92, 200,0),
-                      ylim = latrange, xlim = lonrange)
+    p = p + coord_map("lambert", lat0 = 10, lat = 30, ylim = latrange, xlim = lonrange)
   }
-
 
   return(p)
 }

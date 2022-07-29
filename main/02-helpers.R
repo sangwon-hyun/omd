@@ -358,5 +358,13 @@ trendplot_advanced <- function(distmat_small, ylab = "", mytitle = "", limits = 
     theme(panel.grid.minor = element_blank()) +
     ggtitle(mytitle)
     ## ylim(limits)
+
+
+  ## Add equation of best fit line.
+  ## eq = paste0("y = ", signif(b1,2) , "x +", round(b0,2))
+  eq = paste0("Slope: ", signif(b1,2))
+  p = p + annotate("text", label = eq,  x = Inf, y = Inf,
+                   vjust = 1.3, hjust = 1.1, size = rel(4.5), color = 'red')
+
   return(p)
 }

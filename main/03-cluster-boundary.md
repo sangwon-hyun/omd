@@ -1,11 +1,11 @@
 Cluster boundary comparison using OMD
 ================
-Compiled at 2021-11-24 23:11:49 UTC
+Compiled at 2022-07-29 22:26:28 UTC
 
 ``` r
 knitr::opts_chunk$set(fig.width=14, fig.height=8, echo=TRUE, eval=TRUE, cache=TRUE,
-                      warning=FALSE, message=FALSE,
-                      cache.lazy = FALSE)
+                      warning=FALSE, message=FALSE)
+                      ## cache.lazy = FALSE)
 
 ## Read in libraries
 library(Matrix, quietly = TRUE)
@@ -21,10 +21,8 @@ library(ggspatial, quietly = TRUE)
 library(ggrepel, quietly = TRUE)
 library(gridExtra, quietly = TRUE)
 library(mvtnorm, quietly = TRUE)
-source("03-helpers.R")
-source("02-helpers.R")
-source("01-helpers.R")
-library(omd)
+library(omd, quietly = TRUE)
+sf::sf_use_s2(FALSE)
 
 ## Helper function
 go_down_lat_and_mark_changepoint <- function(onerow){
@@ -48,7 +46,10 @@ knitr::opts_chunk$set(fig.path = here::here("data", base, 'figures/'))
 datadir = here::here("data", base)
 datadir_orig = here::here("data", "00-import-data")
 if(!dir.exists(datadir)) dir.create(datadir)
-figdir = "~/Dropbox/Apps/Overleaf/OMD/figures/"
+figdir = here::here("figures")
+source(here::here("03-helpers.R"))
+source(here::here("02-helpers.R"))
+source(here::here("01-helpers.R"))
 ```
 
 ``` r
@@ -132,28 +133,18 @@ for(mo in 1:12){
   plist[[mo]] = p
 }
 
-## pdf(file = file.path(figdir, "all-boundaries.pdf"), width=18, height=12)
 do.call("grid.arrange", c(plist, ncol = 4, left="Latitude", bottom="Longitude")) 
 ```
 
-![](/home/sangwonh/repos/omd/main/data/03-cluster-boundary/figures/all-boundaries-1.png)<!-- -->
-
-``` r
-## graphics.off()
-```
+![](03-cluster-boundary_files/figure-gfm/all-boundaries-1.png)<!-- -->
 
 The first panel of **Figure 6** is here:
 
 ``` r
-## pdf(file = file.path(figdir, "boundaries-example.pdf"), width=6, height=8)
 do.call("grid.arrange", c(plist[c(3,8)], ncol = 1, left="Latitude", bottom="Longitude")) 
 ```
 
-![](/home/sangwonh/repos/omd/main/data/03-cluster-boundary/figures/unnamed-chunk-1-1.png)<!-- -->
-
-``` r
-## graphics.off()
-```
+![](03-cluster-boundary_files/figure-gfm/unnamed-chunk-1-1.png)<!-- -->
 
 Now, the 24 x 24 distance matrix is calculated:
 
@@ -194,7 +185,6 @@ alldat_list = c(realdat_list, darwindat_list)
 
 distmat = matrix(NA, 24, 24)
 for(ii in 1:24){
-  printprogress(ii, 24)
   for(jj in 1:24){
     if(ii < jj){
 
@@ -227,12 +217,7 @@ p = make_mds_plot(distmat, angle = -pi * 0.3) ## in 01-helpers.R
 plot(p)
 ```
 
-![](/home/sangwonh/repos/omd/main/data/03-cluster-boundary/figures/mds-1.png)<!-- -->
-
-``` r
-figdir = "~/Dropbox/Apps/Overleaf/OMD/figures/"
-## ggsave(file = file.path(figdir, "mds-boundary.pdf"), width = 4, height = 5) 
-```
+![](03-cluster-boundary_files/figure-gfm/mds-1.png)<!-- -->
 
 MDS plot **Figure 6**.
 
@@ -241,9 +226,8 @@ p = plot_distmat_ggplot_clim(distmat)
 plot(p)
 ```
 
-![](/home/sangwonh/repos/omd/main/data/03-cluster-boundary/figures/distmat-1.png)<!-- -->
+![](03-cluster-boundary_files/figure-gfm/distmat-1.png)<!-- -->
 
 ``` r
 plotfilename = "distmat-boundary.pdf"
-## ggsave(file.path(figdir, plotfilename), width = 6, height=6)
 ```

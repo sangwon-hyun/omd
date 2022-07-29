@@ -66,7 +66,6 @@ get_nonclim_dat <- function(type = c("real", "darwin"),
     print("Size of data is")
     object.size(dat) %>% format("Mb") %>% print()
   }
-  browser()
   ## stopifnot((times %>% length()) ==
   ##           (read.csv(timefile) %>% .[,2] %>% length()))
 

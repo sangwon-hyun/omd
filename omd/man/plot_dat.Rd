@@ -2,7 +2,7 @@
 % Please edit documentation in R/plot.R
 \name{plot_dat}
 \alias{plot_dat}
-\title{Make a multi-panel plot of the data.}
+\title{(Simpler, easier projection) Make a multi-panel plot of the data.}
 \usage{
 plot_dat(
   longdat = NULL,
@@ -37,5 +37,5 @@ in a single panel}
 ggplot object.
 }
 \description{
-Make a multi-panel plot of the data.
+(Simpler, easier projection) Make a multi-panel plot of the data.
 }

@@ -1,6 +1,6 @@
 Importing data
 ================
-Compiled at 2021-11-24 22:40:12 UTC
+Compiled at 2022-07-28 22:19:48 UTC
 
 ``` r
 knitr::opts_chunk$set(fig.width=14, fig.height=8, echo=TRUE, eval=TRUE, cache=FALSE,
@@ -14,19 +14,30 @@ library(here, quietly = TRUE)
 library(ggplot2, quietly = TRUE)
 library(tidync, quietly = TRUE)
 library(omd, quietly = TRUE)
-source("00-helpers.R")
+```
+
+    ## Warning: replacing previous import 'dplyr::union' by 'raster::union' when loading 'omd'
+
+    ## Warning: replacing previous import 'dplyr::select' by 'raster::select' when loading 'omd'
+
+    ## Warning: replacing previous import 'dplyr::intersect' by 'raster::intersect' when loading 'omd'
+
+``` r
+library(ggstar, quietly = TRUE)
+sf::sf_use_s2(FALSE)
 ```
 
 The R package `omd` to use is here
-<https://github.com/sangwon-hyun/omd/>, commit number ()\[\].
+<https://github.com/sangwon-hyun/omd/>.
 
 ``` r
 base = "00-import-data"
 here::i_am("00-import-data.Rmd")
 knitr::opts_chunk$set(fig.path = here::here("data", base, 'figures/'))
 datadir = here::here("data", base)
-## outputdir = here::here("data", base)
 if(!dir.exists(datadir)) dir.create(datadir)
+figdir = here::here("figures")
+source(here::here("00-helpers.R"))
 ```
 
 There are three datasets for this project, all placed here
@@ -66,7 +77,7 @@ rdat = read.csv(file.path(datadir, filenames[2+4])) %>% as_tibble()
 print(rdat)
 ```
 
-    ## # A tibble: 194,400 x 19
+    ## # A tibble: 194,400 × 19
     ##        X month   lat   lon   SST   Chl   PAR Kd490 euphotic_depth   mld  wind   EKE bathymetry Rrs412 Rrs443 Rrs490 Rrs510 Rrs555
     ##    <int> <int> <dbl> <dbl> <dbl> <dbl> <dbl> <dbl>          <dbl> <dbl> <dbl> <dbl>      <dbl>  <dbl>  <dbl>  <dbl>  <dbl>  <dbl>
     ##  1     0     1 -89.8 -180.    NA    NA    NA    NA             NA    NA    NA    NA          0     NA     NA     NA     NA     NA
@@ -85,7 +96,7 @@ print(rdat)
 print(ddat)
 ```
 
-    ## # A tibble: 130,692 x 19
+    ## # A tibble: 130,692 × 19
     ##        X month   lat   lon   SST  SALT   Chl  Rrs412  Rrs443  Rrs490  Rrs510  Rrs555   Rrs670   MLD bathymetry  wind     TKE   PAR
     ##    <int> <int> <dbl> <dbl> <dbl> <dbl> <dbl>   <dbl>   <dbl>   <dbl>   <dbl>   <dbl>    <dbl> <dbl>      <dbl> <dbl>   <dbl> <dbl>
     ##  1   900     1 -79.8 -180. 0.726  34.0 0.495 0.00493 0.00532 0.00534 0.00453 0.00290 0.000342  19.3      172.   4.03 1.69e-4  532.
@@ -158,7 +169,6 @@ for(dat_type in c("darwin", "real")){
   num_groups = length(indices)
   start.time = Sys.time()
   for(ii in 1:num_groups){
-    printprogress(ii, num_groups, fill = TRUE, start.time = start.time)
     ind = indices[[ii]]
     dat = get_nonclim_dat(type = dat_type, datadir = datadir,
                                  lonrange = lonrange,
@@ -207,7 +217,6 @@ for(dat_type in c("darwin", "real")){
 
   ## Save each month-year into separate file.
   for(ii in 1:length(dlist)){
-    printprogress(ii, length(dlist))
 
     ## Extract month information
     thismo = dlist[[ii]] %>% pull(mo) %>% unique()
@@ -238,5 +247,73 @@ for(dat_type in c("darwin", "real")){
     filename = paste0(dat_type, "-nonclim-", thisyear, "-", thismo, ".RDS")
     saveRDS(one_month_dat, file = file.path(datadir, filename))
   }
+}
+```
+
+This produces a Chlorophyll map that is larger, and shows two boxes.
+
+<!-- Also, this should remove the need for the star in Figure 1. -->
+
+``` r
+## Form Smaller box
+lat = 19.8968
+lon = -155.5828
+boxsize = 30
+lonrange_small = lon + c(-1,1)*boxsize
+latrange_small = lat + c(-.3,1)*boxsize
+
+## Medium box
+boxsize = 40
+lonrange = lon + c(-1,1) * boxsize
+latrange = lat + c(-1,1) * boxsize
+latrange = pmin(latrange, 48.25) 
+latrange = pmax(latrange, -20.5) 
+
+## Medium box
+boxsize = 40
+lonrange_large = lon + c(-1,1) * boxsize
+latrange_large = lat + c(-1,1) * boxsize
+
+## Get January Darwin data
+datadir = "/home/sangwonh/repos/omd/main/data/00-import-data"
+ddat = read.csv(file.path(datadir, filenames[2])) %>% as_tibble()
+
+## Successively narrow down the data
+smallerdat = ddat %>% filter(month == 1) %>% dplyr::select(lon, lat, val = Chl)
+smallerdat2 = smallerdat
+smallerdat2$lon = smallerdat2$lon - 360
+smallerdat = smallerdat %>% rbind(smallerdat2)
+smallerdat = smallerdat %>% 
+  dplyr::filter(lon < -50) %>%
+  dplyr::filter(lon > -200) %>%
+  dplyr::filter(lat < 85) %>%
+  dplyr::filter(lat > -40)
+
+p = smallerdat %>% 
+  plot_dat(add_map = TRUE) +
+  geom_rect(xmin = -180, xmax = lonrange[2],
+            ymin = latrange[1], ymax = latrange[2],
+            col = 'black', fill = NA, size = 1.3) + 
+  geom_rect(xmin = -180, xmax = lonrange_small[2],
+            ymin = latrange_small[1], ymax = latrange_small[2],
+            col = 'white', fill = NA, size = 1.3, linetype = "dashed") +
+  geom_rect(xmin = -180, xmax = lonrange_large[2],
+            ymin = latrange_large[1], ymax = latrange_large[2],
+            col = 'red', fill = NA, size = 1.3, linetype = "dotted") +
+  scale_y_continuous(breaks = seq(from = -40,##ceiling(min(smallerdat$lat)),
+                                  to = 80,   ##floor(max(smallerdat$lat)),
+                                  by=20)) +
+  geom_star(aes(x=lon, y=lat), data = data.frame(lat = 22.45, lon = -158), size=5,
+            fill = 'yellow', col = 'black') 
+plot(p)
+```
+
+![](/home/sangwonh/repos/omd/main/data/00-import-data/figures/larger-map-1.png)<!-- -->
+
+``` r
+## Plotting the map to a file.
+if(FALSE){
+  plotfilename = "orient-the-box.pdf"
+  ggsave(filename = file.path(figdir, plotfilename), height = 5, width = 5)
 }
 ```

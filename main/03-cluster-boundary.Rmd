@@ -7,8 +7,8 @@ output:
 
 ```{r global_options, include=TRUE, message=FALSE, warning=FALSE}
 knitr::opts_chunk$set(fig.width=14, fig.height=8, echo=TRUE, eval=TRUE, cache=TRUE,
-                      warning=FALSE, message=FALSE,
-                      cache.lazy = FALSE)
+                      warning=FALSE, message=FALSE)
+                      ## cache.lazy = FALSE)
 
 ## Read in libraries
 library(Matrix, quietly = TRUE)
@@ -24,10 +24,8 @@ library(ggspatial, quietly = TRUE)
 library(ggrepel, quietly = TRUE)
 library(gridExtra, quietly = TRUE)
 library(mvtnorm, quietly = TRUE)
-source("03-helpers.R")
-source("02-helpers.R")
-source("01-helpers.R")
-library(omd)
+library(omd, quietly = TRUE)
+sf::sf_use_s2(FALSE)
 
 ## Helper function
 go_down_lat_and_mark_changepoint <- function(onerow){
@@ -52,7 +50,10 @@ knitr::opts_chunk$set(fig.path = here::here("data", base, 'figures/'))
 datadir = here::here("data", base)
 datadir_orig = here::here("data", "00-import-data")
 if(!dir.exists(datadir)) dir.create(datadir)
-figdir = "~/Dropbox/Apps/Overleaf/OMD/figures/"
+figdir = here::here("figures")
+source(here::here("03-helpers.R"))
+source(here::here("02-helpers.R"))
+source(here::here("01-helpers.R"))
 ```
 
 
@@ -137,17 +138,13 @@ for(mo in 1:12){
   plist[[mo]] = p
 }
 
-## pdf(file = file.path(figdir, "all-boundaries.pdf"), width=18, height=12)
 do.call("grid.arrange", c(plist, ncol = 4, left="Latitude", bottom="Longitude")) 
-## graphics.off()
 ```
 
 The first panel of **Figure 6** is here:
 
 ```{r fig.width = 4, fig.height = 8}
-## pdf(file = file.path(figdir, "boundaries-example.pdf"), width=6, height=8)
 do.call("grid.arrange", c(plist[c(3,8)], ncol = 1, left="Latitude", bottom="Longitude")) 
-## graphics.off()
 ```
 
 
@@ -190,7 +187,6 @@ alldat_list = c(realdat_list, darwindat_list)
 
 distmat = matrix(NA, 24, 24)
 for(ii in 1:24){
-  printprogress(ii, 24)
   for(jj in 1:24){
     if(ii < jj){
 
@@ -221,8 +217,6 @@ MDS plot **Figure 6**.
 distmat = readRDS(file = file.path(datadir, "distmat-boundary.RDS"))
 p = make_mds_plot(distmat, angle = -pi * 0.3) ## in 01-helpers.R
 plot(p)
-figdir = "~/Dropbox/Apps/Overleaf/OMD/figures/"
-## ggsave(file = file.path(figdir, "mds-boundary.pdf"), width = 4, height = 5) 
 ```
 
 MDS plot **Figure 6**.
@@ -231,5 +225,4 @@ MDS plot **Figure 6**.
 p = plot_distmat_ggplot_clim(distmat)
 plot(p)
 plotfilename = "distmat-boundary.pdf"
-## ggsave(file.path(figdir, plotfilename), width = 6, height=6)
 ```
